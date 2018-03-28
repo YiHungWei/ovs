@@ -397,15 +397,17 @@ the controller fails, no new network connections can be set up.  If
 the connection to the controller stays down long enough, no packets
 can pass through the switch at all.
 .PP
-If the value is \fBstandalone\fR, or if neither of these settings
-is set, \fBovs\-vswitchd\fR will take over
+If the value is \fBstandalone\fR or \fBstandalone-loose\fR, or if neither of
+these settings is set, \fBovs\-vswitchd\fR will take over
 responsibility for setting up
 flows when no message has been received from the controller for three
 times the inactivity probe interval.  In this mode,
 \fBovs\-vswitchd\fR causes the datapath to act like an ordinary
 MAC-learning switch.  \fBovs\-vswitchd\fR will continue to retry connecting
 to the controller in the background and, when the connection succeeds,
-it discontinues its standalone behavior.
+it discontinues its standalone behavior.  Once the controller is reconnected,
+\fBstandalone\fB mode removes the setup flows right away, while the
+\fBstadalone-loose\fB mode keeps the flows.
 .PP
 If this option is set to \fBsecure\fR, \fBovs\-vswitchd\fR will not
 set up flows on its own when the controller connection fails.
@@ -416,7 +418,7 @@ Prints the configured failure mode.
 .IP "\fBdel\-fail\-mode\fR \fIbridge\fR"
 Deletes the configured failure mode.
 .
-.IP "\fBset\-fail\-mode\fR \fIbridge\fR \fBstandalone\fR|\fBsecure\fR"
+.IP "\fBset\-fail\-mode\fR \fIbridge\fR \fBstandalone\fR|\fBstandalone-loose\fR|\fBsecure\fR"
 Sets the configured failure mode.
 .
 .SS "Manager Connectivity"

@@ -3673,10 +3673,14 @@ bridge_configure_remotes(struct bridge *br,
     free(ocs);
 
     /* Set the fail-mode. */
-    fail_mode = !br->cfg->fail_mode
-                || !strcmp(br->cfg->fail_mode, "standalone")
-                    ? OFPROTO_FAIL_STANDALONE
-                    : OFPROTO_FAIL_SECURE;
+    if (!br->cfg->fail_mode ||
+        !strcmp(br->cfg->fail_mode, "standalone")) {
+        fail_mode = OFPROTO_FAIL_STANDALONE;
+    } else if (!strcmp(br->cfg->fail_mode, "standalone-loose")) {
+        fail_mode = OFPROTO_FAIL_STANDALONE_LOOSE;
+    } else {
+        fail_mode = OFPROTO_FAIL_SECURE;
+    }
     ofproto_set_fail_mode(br->ofproto, fail_mode);
 
     /* Configure OpenFlow controller connection snooping. */

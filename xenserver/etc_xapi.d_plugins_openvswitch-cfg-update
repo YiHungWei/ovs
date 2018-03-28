@@ -150,10 +150,10 @@ def update(session, args):
         except KeyError, e:
             fail_mode = None
 
-        if fail_mode not in ['secure', 'standalone']:
+        if fail_mode not in ['secure', 'standalone', 'standalone-loose']:
             fail_mode = pool_fail_mode
 
-        if fail_mode != 'secure':
+        if fail_mode != 'secure' or fail_mode != 'standalone-loose':
             fail_mode = 'standalone'
 
         if bridge_fail_mode != fail_mode:

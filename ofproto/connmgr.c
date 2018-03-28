@@ -477,7 +477,8 @@ static void add_controller(struct connmgr *, const char *target, uint8_t dscp,
     OVS_REQUIRES(ofproto_mutex);
 static struct ofconn *find_controller_by_target(struct connmgr *,
                                                 const char *target);
-static void update_fail_open(struct connmgr *) OVS_EXCLUDED(ofproto_mutex);
+static void update_fail_open(struct connmgr *, enum ofproto_fail_mode)
+    OVS_EXCLUDED(ofproto_mutex);
 static int set_pvconns(struct pvconn ***pvconnsp, size_t *n_pvconnsp,
                        const struct sset *);
 
@@ -677,7 +678,7 @@ connmgr_set_controllers(struct connmgr *mgr,
     ovs_mutex_unlock(&ofproto_mutex);
 
     update_in_band_remotes(mgr);
-    update_fail_open(mgr);
+    update_fail_open(mgr, mgr->fail_mode);
     if (had_controllers != connmgr_has_controllers(mgr)) {
         ofproto_flush_flows(mgr->ofproto);
     }
@@ -805,13 +806,18 @@ update_in_band_remotes(struct connmgr *mgr)
 }
 
 static void
-update_fail_open(struct connmgr *mgr)
+update_fail_open(struct connmgr *mgr, enum ofproto_fail_mode fail_mode)
     OVS_EXCLUDED(ofproto_mutex)
 {
     if (connmgr_has_controllers(mgr)
-        && mgr->fail_mode == OFPROTO_FAIL_STANDALONE) {
+        && (fail_mode == OFPROTO_FAIL_STANDALONE
+            || fail_mode == OFPROTO_FAIL_STANDALONE_LOOSE)) {
         if (!mgr->fail_open) {
             mgr->fail_open = fail_open_create(mgr->ofproto, mgr);
+        } else if (fail_open_is_active(mgr->fail_open)) {
+            ovs_mutex_lock(&ofproto_mutex);
+            fail_open_update(mgr->fail_open, fail_mode);
+            ovs_mutex_unlock(&ofproto_mutex);
         }
     } else {
         ovs_mutex_lock(&ofproto_mutex);
@@ -819,6 +825,7 @@ update_fail_open(struct connmgr *mgr)
         ovs_mutex_unlock(&ofproto_mutex);
         mgr->fail_open = NULL;
     }
+    mgr->fail_mode = fail_mode;
 }
 
 static int
@@ -1771,22 +1778,22 @@ do_send_packet_ins(struct ofconn *ofconn, struct ovs_list *txq)
 
 /* Fail-open settings. */
 
-/* Returns the failure handling mode (OFPROTO_FAIL_SECURE or
- * OFPROTO_FAIL_STANDALONE) for 'mgr'. */
+/* Returns the failure handling mode (OFPROTO_FAIL_SECURE,
+ * OFPROTO_FAIL_STANDALONE, or OFPROTO_FAIL_STANDALONE_LOOSE) for 'mgr'. */
 enum ofproto_fail_mode
 connmgr_get_fail_mode(const struct connmgr *mgr)
 {
     return mgr->fail_mode;
 }
 
-/* Sets the failure handling mode for 'mgr' to 'fail_mode' (either
- * OFPROTO_FAIL_SECURE or OFPROTO_FAIL_STANDALONE). */
+/* Sets the failure handling mode for 'mgr' to 'fail_mode' (one of
+ * OFPROTO_FAIL_SECURE, OFPROTO_FAIL_STANDALONE,
+ * OFPROTO_FAIL_STANDALONE_LOOSE). */
 void
 connmgr_set_fail_mode(struct connmgr *mgr, enum ofproto_fail_mode fail_mode)
 {
     if (mgr->fail_mode != fail_mode) {
-        mgr->fail_mode = fail_mode;
-        update_fail_open(mgr);
+        update_fail_open(mgr, fail_mode);
         if (!connmgr_has_controllers(mgr)) {
             ofproto_flush_flows(mgr->ofproto);
         }
@@ -1939,15 +1946,17 @@ connmgr_flushed(struct connmgr *mgr)
     OVS_EXCLUDED(ofproto_mutex)
 {
     if (mgr->fail_open) {
-        fail_open_flushed(mgr->fail_open);
+        fail_open_flushed(mgr->fail_open, mgr->fail_mode);
     }
 
-    /* If there are no controllers and we're in standalone mode, set up a flow
-     * that matches every packet and directs them to OFPP_NORMAL (which goes to
-     * us).  Otherwise, the switch is in secure mode and we won't pass any
-     * traffic until a controller has been defined and it tells us to do so. */
+    /* If there are no controllers and we're in standalone or standalone-loose
+     * mode, set up a flow that matches every packet and directs them to
+     * OFPP_NORMAL (which goes to us).  Otherwise, the switch is in secure mode
+     * and we won't pass any traffic until a controller has been defined and it
+     * tells us to do so. */
     if (!connmgr_has_controllers(mgr)
-        && mgr->fail_mode == OFPROTO_FAIL_STANDALONE) {
+        && (mgr->fail_mode == OFPROTO_FAIL_STANDALONE
+            || mgr->fail_mode == OFPROTO_FAIL_STANDALONE_LOOSE)) {
         struct ofpbuf ofpacts;
         struct match match;
 

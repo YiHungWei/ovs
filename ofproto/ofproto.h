@@ -198,8 +198,12 @@ struct ofproto_mcast_snooping_port_settings {
 
 /* How the switch should act if the controller cannot be contacted. */
 enum ofproto_fail_mode {
-    OFPROTO_FAIL_SECURE,        /* Preserve flow table. */
-    OFPROTO_FAIL_STANDALONE     /* Act as a standalone switch. */
+    OFPROTO_FAIL_SECURE,                /* Preserve flow table. */
+    OFPROTO_FAIL_STANDALONE,            /* Act as a standalone switch. */
+    OFPROTO_FAIL_STANDALONE_LOOSE       /* Act as a standalone switch as the
+                                         * standalone mode, but leave the
+                                         * NORMAL flow when the controller
+                                         * is reconnected. */
 };
 
 enum ofproto_band {

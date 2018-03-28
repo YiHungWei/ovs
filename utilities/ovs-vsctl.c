@@ -2007,8 +2007,10 @@ cmd_set_fail_mode(struct ctl_context *ctx)
 
     br = find_real_bridge(vsctl_ctx, ctx->argv[1], true);
 
-    if (strcmp(fail_mode, "standalone") && strcmp(fail_mode, "secure")) {
-        ctl_fatal("fail-mode must be \"standalone\" or \"secure\"");
+    if (strcmp(fail_mode, "standalone") && strcmp(fail_mode, "secure") &&
+        strcmp(fail_mode, "standalone-loose")) {
+        ctl_fatal("fail-mode must be \"standalone\", \"standalone-loose\" or "
+                  "\"secure\"");
     }
 
     ovsrec_bridge_set_fail_mode(br->br_cfg, fail_mode);

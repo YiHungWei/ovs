@@ -1,6 +1,6 @@
 {"name": "Open_vSwitch",
- "version": "7.15.1",
- "cksum": "3682332033 23608",
+ "version": "7.16.0",
+ "cksum": "1548816770 23671",
  "tables": {
    "Open_vSwitch": {
      "columns": {
@@ -104,7 +104,8 @@
 	   "min": 0, "max": "unlimited"}},
        "fail_mode": {
          "type": {"key": {"type": "string",
-                          "enum": ["set", ["standalone", "secure"]]},
+                          "enum": ["set", ["standalone", "secure",
+                                           "standalone-loose"]]},
                   "min": 0, "max": 1}},
        "status": {
          "type": {"key": "string", "value": "string",

@@ -146,20 +146,24 @@ send_bogus_packet_ins(struct fail_open *fo)
 }
 
 static void
-fail_open_del_normal_flow(struct fail_open *fo)
+fail_open_del_normal_flow(struct fail_open *fo, enum ofproto_fail_mode mode)
     OVS_REQUIRES(ofproto_mutex)
 {
     struct match match;
+    int priority = mode ==  OFPROTO_FAIL_STANDALONE ?
+        FAIL_OPEN_PRIORITY : FAIL_OPEN_PRIORITY_STANDALONE_LOOSE;
 
     match_init_catchall(&match);
-    ofproto_delete_flow(fo->ofproto, &match, FAIL_OPEN_PRIORITY);
+    ofproto_delete_flow(fo->ofproto, &match, priority);
 }
 
 static void
-fail_open_add_normal_flow(struct fail_open *fo)
+fail_open_add_normal_flow(struct fail_open *fo, enum ofproto_fail_mode mode)
 {
     struct ofpbuf ofpacts;
     struct match match;
+    int priority = mode ==  OFPROTO_FAIL_STANDALONE ?
+        FAIL_OPEN_PRIORITY : FAIL_OPEN_PRIORITY_STANDALONE_LOOSE;
 
     /* Set up a flow that matches every packet and directs them to
      * OFPP_NORMAL. */
@@ -167,8 +171,8 @@ fail_open_add_normal_flow(struct fail_open *fo)
     ofpact_put_OUTPUT(&ofpacts)->port = OFPP_NORMAL;
 
     match_init_catchall(&match);
-    ofproto_add_flow(fo->ofproto, &match, FAIL_OPEN_PRIORITY,
-            ofpacts.data, ofpacts.size);
+    ofproto_add_flow(fo->ofproto, &match, priority, ofpacts.data,
+                     ofpacts.size);
 
     ofpbuf_uninit(&ofpacts);
 }
@@ -237,7 +241,9 @@ fail_open_recover(struct fail_open *fo)
     fo->last_disconn_secs = 0;
     fo->next_bogus_packet_in = LLONG_MAX;
 
-    fail_open_del_normal_flow(fo);
+   if (connmgr_get_fail_mode(fo->connmgr) == OFPROTO_FAIL_STANDALONE) {
+        fail_open_del_normal_flow(fo, OFPROTO_FAIL_STANDALONE);
+   }
 }
 
 void
@@ -249,13 +255,13 @@ fail_open_wait(struct fail_open *fo)
 }
 
 void
-fail_open_flushed(struct fail_open *fo)
+fail_open_flushed(struct fail_open *fo, enum ofproto_fail_mode mode)
     OVS_EXCLUDED(ofproto_mutex)
 {
     int disconn_secs = connmgr_failure_duration(fo->connmgr);
     bool open = disconn_secs >= trigger_duration(fo);
     if (open) {
-        fail_open_add_normal_flow(fo);
+        fail_open_add_normal_flow(fo, mode);
     }
     fo->fail_open_active = open;
 }
@@ -294,5 +300,15 @@ fail_open_destroy(struct fail_open *fo)
         /* We don't own fo->connmgr. */
         rconn_packet_counter_destroy(fo->bogus_packet_counter);
         free(fo);
+    }
+}
+
+void
+fail_open_update(struct fail_open *fo, enum ofproto_fail_mode fail_mode)
+    OVS_REQUIRES(ofproto_mutex)
+{
+    if (fo) {
+        fail_open_del_normal_flow(fo, connmgr_get_fail_mode(fo->connmgr));
+        fail_open_add_normal_flow(fo, fail_mode);
     }
 }

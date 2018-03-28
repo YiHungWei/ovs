@@ -30,6 +30,7 @@ struct ofproto;
  * (OpenFlow priorities max out at 65535 and nothing else in Open vSwitch
  * creates flows with this priority).  And "f0" is mnemonic for "fail open"! */
 #define FAIL_OPEN_PRIORITY 0xf0f0f0
+#define FAIL_OPEN_PRIORITY_STANDALONE_LOOSE 32768
 
 /* Returns true if 'rule' is one created by the "fail open" logic, false
  * otherwise. */
@@ -45,7 +46,9 @@ void fail_open_wait(struct fail_open *);
 bool fail_open_is_active(const struct fail_open *);
 void fail_open_run(struct fail_open *);
 void fail_open_maybe_recover(struct fail_open *) OVS_EXCLUDED(ofproto_mutex);
-void fail_open_flushed(struct fail_open *) OVS_EXCLUDED(ofproto_mutex);
+void fail_open_flushed(struct fail_open *, enum ofproto_fail_mode)
+    OVS_EXCLUDED(ofproto_mutex);
+void fail_open_update(struct fail_open *, enum ofproto_fail_mode);
 
 int fail_open_count_rules(const struct fail_open *);
 

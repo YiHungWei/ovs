@@ -79,3 +79,43 @@ AT_CHECK([ovs-vsctl --columns=status list controller | dnl
 OVS_APP_EXIT_AND_WAIT([ovs-vswitchd])
 OVS_APP_EXIT_AND_WAIT([ovsdb-server])
 AT_CLEANUP
+
+AT_SETUP([bridge - standalone-loose fail safe mode])
+OVS_VSWITCHD_START
+
+dnl Add the controller br0
+AT_CHECK([ovs-vsctl set-controller br0 unix:controller])
+AT_CHECK([ovs-vsctl set-fail-mode br0 standalone-loose])
+
+dnl Enable fail-safe mode
+AT_CHECK([ovs-appctl time/warp 15000], [0], [ignore])
+AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip], [0], [dnl
+NXST_FLOW reply:
+ actions=NORMAL
+])
+
+dnl Start ovs-testcontroller, the NORMAL flow should be kept there
+AT_CHECK([ovs-testcontroller --detach punix:controller --pidfile], [0], [ignore])
+on_exit 'kill `cat ovs-testcontroller.pid`'
+OVS_WAIT_UNTIL([test -e controller])
+
+dnl Wait for the controller connectionsi to be up
+for i in `seq 0 19`
+do
+    if ovs-vsctl --columns=is_connected list controller |grep "false"; then
+        :
+    else
+        break
+    fi
+    ovs-appctl time/warp 1100
+done
+
+AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip], [0], [dnl
+NXST_FLOW reply:
+ actions=NORMAL
+ priority=0 actions=CONTROLLER:128
+])
+
+OVS_APP_EXIT_AND_WAIT([ovs-vswitchd])
+OVS_APP_EXIT_AND_WAIT([ovsdb-server])
+AT_CLEANUP

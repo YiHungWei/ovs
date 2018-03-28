@@ -400,7 +400,7 @@ def configure_datapath(pif):
     network = db().get_network_by_bridge(bridge)
     network_rec = None
     fail_mode = None
-    valid_fail_modes = ['standalone', 'secure']
+    valid_fail_modes = ['standalone', 'secure', 'standalone-loose']
 
     if network:
         network_rec = db().get_network_record(network)

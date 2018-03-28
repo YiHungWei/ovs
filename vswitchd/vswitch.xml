@@ -815,6 +815,10 @@
           to retry connecting to the controller in the background
           and, when the connection succeeds, it will discontinue its
           standalone behavior.</dd>
+          <dt><code>standalone-loose</code></dt>
+          <dd>standalone-loose mode behaves similarly as the standalone
+          mode, except that it keeps the setup flows when the controller
+          is reconnected.</dd>
           <dt><code>secure</code></dt>
           <dd>Open vSwitch will not set up flows on its own when the
           controller connection fails or when no controllers are

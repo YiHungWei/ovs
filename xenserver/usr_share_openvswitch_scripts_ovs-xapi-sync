@@ -201,7 +201,7 @@ def update_fail_mode(row):
             fail_mode = prec['other_config'].get(
                     'vswitch-controller-fail-mode')
 
-    if fail_mode not in ['standalone', 'secure']:
+    if fail_mode not in ['standalone', 'secure', 'standalone-loose']:
         fail_mode = 'standalone'
 
     row.verify("fail_mode")
