@@ -7138,7 +7138,7 @@ xlate_actions(struct xlate_in *xin, struct xlate_out *xout)
             ctx.error = XLATE_INVALID_TUNNEL_METADATA;
             goto exit;
         }
-    } else if (!flow->tunnel.metadata.tab) {
+    } else if (!flow->tunnel.metadata.tab || xin->frozen_state) {
         /* If the original flow did not come in on a tunnel, then it won't have
          * FLOW_TNL_F_UDPIF set. However, we still need to have a metadata
          * table in case we generate tunnel actions. */
