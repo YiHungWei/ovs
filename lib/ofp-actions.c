@@ -6412,6 +6412,8 @@ check_DEBUG_SLOW(const struct ofpact_null *a OVS_UNUSED,
  *      NXM_NX_CT_STATE field for such connections if the 'recirc_table' is
  *      specified.
  *
+ * XXX: Document ovs timeout
+ *
  * Zero or more actions may immediately follow this action. These actions will
  * be executed within the context of the connection tracker, and they require
  * NX_CT_F_COMMIT flag be set.
@@ -6430,7 +6432,9 @@ struct nx_action_conntrack {
     };
     uint8_t recirc_table;       /* Recirculate to a specific table, or
                                    NX_CT_RECIRC_NONE for no recirculation. */
-    uint8_t pad[3];             /* Zeroes */
+    uint8_t pad[1];             /* Zeroes */
+    ovs_be16 timeout;           /* XXX:
+                                 * 0 indicates no customized timeout. */
     ovs_be16 alg;               /* Well-known port number for the protocol.
                                  * 0 indicates no ALG is required. */
     /* Followed by a sequence of zero or more OpenFlow actions. The length of
@@ -6496,6 +6500,8 @@ decode_NXAST_RAW_CT(const struct nx_action_conntrack *nac,
     }
     conntrack->recirc_table = nac->recirc_table;
     conntrack->alg = ntohs(nac->alg);
+    conntrack->timeout = ntohs(nac->timeout);
+    VLOG_INFO("yhwei:%s: timeout: %d\n", __func__, conntrack->timeout);
 
     ofpbuf_pull(out, sizeof(*conntrack));
 
@@ -6555,6 +6561,8 @@ encode_CT(const struct ofpact_conntrack *conntrack,
     }
     nac->recirc_table = conntrack->recirc_table;
     nac->alg = htons(conntrack->alg);
+    nac->timeout = htons(conntrack->timeout);
+    VLOG_INFO("yhwei:%s: timeout: %d\n", __func__, nac->timeout);
 
     len = ofpacts_put_openflow_actions(conntrack->actions,
                                        ofpact_ct_get_action_len(conntrack),
@@ -6607,6 +6615,9 @@ parse_CT(char *arg, const struct ofpact_parse_params *pp)
             }
         } else if (!strcmp(key, "alg")) {
             error = str_to_connhelper(value, &oc->alg);
+        } else if (!strcmp(key, "timeout")) {
+            error = str_to_u16(value, "timeout", &oc->timeout);
+            VLOG_INFO("yhwei:%s: timeout: %d\n", __func__, oc->timeout);
         } else if (!strcmp(key, "nat")) {
             const size_t nat_offset = ofpacts_pull(pp->ofpacts);
 
@@ -6711,6 +6722,10 @@ format_CT(const struct ofpact_conntrack *a,
         ds_put_format(fp->s, "%s),%s", colors.paren, colors.end);
     }
     format_alg(a->alg, fp->s);
+    if (a->timeout) {
+        ds_put_format(fp->s, "%stimeout=%s%d", colors.paren, colors.end,
+                      a->timeout);
+    }
     ds_chomp(fp->s, ',');
     ds_put_format(fp->s, "%s)%s", colors.paren, colors.end);
 }
