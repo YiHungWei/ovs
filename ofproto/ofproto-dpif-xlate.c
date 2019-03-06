@@ -5962,6 +5962,19 @@ put_ct_helper(struct xlate_ctx *ctx,
 }
 
 static void
+put_ct_timeout(struct ofpbuf *odp_actions, struct ofpact_conntrack *ofc)
+{
+        VLOG_INFO("yhwei:%s:timeout = %d\n", __func__, ofc->timeout);
+    if (ofc->timeout) {
+        VLOG_INFO("yhwei:%s:timeout = %d\n", __func__, ofc->timeout);
+        struct ds s = DS_EMPTY_INITIALIZER;
+        ds_put_format(&s, "%s%d", "ovs_timeout_", ofc->timeout);
+        nl_msg_put_string(odp_actions, OVS_CT_ATTR_TIMEOUT, ds_cstr(&s));
+        ds_destroy(&s);
+    }
+}
+
+static void
 put_ct_nat(struct xlate_ctx *ctx)
 {
     struct ofpact_nat *ofn = ctx->ct_nat_action;
@@ -6056,6 +6069,7 @@ compose_conntrack_action(struct xlate_ctx *ctx, struct ofpact_conntrack *ofc,
     put_ct_mark(&ctx->xin->flow, ctx->odp_actions, ctx->wc);
     put_ct_label(&ctx->xin->flow, ctx->odp_actions, ctx->wc);
     put_ct_helper(ctx, ctx->odp_actions, ofc);
+    put_ct_timeout(ctx->odp_actions, ofc);
     put_ct_nat(ctx);
     ctx->ct_nat_action = NULL;
     nl_msg_end_nested(ctx->odp_actions, ct_offset);

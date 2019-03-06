@@ -7132,6 +7132,9 @@ dp_execute_cb(void *aux_, struct dp_packet_batch *packets_,
                 /* Silently ignored, as userspace datapath does not generate
                  * netlink events. */
                 break;
+            case OVS_CT_ATTR_TIMEOUT:
+                /* XXX: userspace datapath does not support customized timeout. */
+                break;
             case OVS_CT_ATTR_NAT: {
                 const struct nlattr *b_nest;
                 unsigned int left_nest;

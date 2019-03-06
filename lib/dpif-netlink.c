@@ -1651,6 +1651,7 @@ dpif_netlink_flow_dump_next(struct dpif_flow_dump_thread *thread_,
     max_flows = MIN(max_flows, FLOW_DUMP_MAX_BATCH);
 
     while (!thread->netdev_done && n_flows < max_flows) {
+        //VLOG_INFO("yhwei: %s: 1st here\n", __func__);
         struct odputil_keybuf *maskbuf = &thread->maskbuf[n_flows];
         struct odputil_keybuf *keybuf = &thread->keybuf[n_flows];
         struct odputil_keybuf *actbuf = &thread->actbuf[n_flows];
@@ -1698,6 +1699,7 @@ dpif_netlink_flow_dump_next(struct dpif_flow_dump_thread *thread_,
         struct ofpbuf nl_flow;
         int error;
 
+        //VLOG_INFO("yhwei: %s: 2nd here\n", __func__);
         /* Try to grab another flow. */
         if (!nl_dump_next(&dump->nl_dump, &nl_flow, &thread->nl_flows)) {
             break;
