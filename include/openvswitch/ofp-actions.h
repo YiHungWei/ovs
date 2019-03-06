@@ -672,6 +672,7 @@ struct ofpact_conntrack {
         uint16_t zone_imm;
         struct mf_subfield zone_src;
         uint16_t alg;
+        uint16_t timeout;
         uint8_t recirc_table;
     );
     struct ofpact actions[0];
