@@ -1855,6 +1855,35 @@ $ ovs-ofctl -O OpenFlow10 add-flow br0 actions=mod_nw_src:1.2.3.4
             <code>ct(alg=</code>...<code>)</code>).
           </p>
         </dd>
+        <dt><code>timeout=<var>timeout</var></code></dt>
+        <dd>
+          <p>
+            Specify a timeout policy to associate with the connection.
+            The timeout policy is preconfigured in the datapath, and it
+            is used to associated with connection when the connection is
+            committed. <var>timeout</var> is a 16-bit number.
+            By default, or with <code>timeout=0</code>, the datapath associates
+            the connection with the datapath's default timeout.
+          </p>
+
+          <p>
+            If <var>timeout</var> is non-zero, in Linux datapath, it associates
+            the connection with timeout policy:
+            <code>ovs_timeout_<var>timeout</var></code> (i.e. it associates
+            the connection with ovs_timeout_3 if <code>timeout=3</code>).
+            If the datapath fails to associate with the specified timeout
+            policy, it uses the datapath's default timeout.
+            Refer to <code>nfct</code>(8) for more details on configuring
+            timeout policy on Linux kernel datapath. The conntrack
+            <code>timeout</code> support on Linux kernel datapath was
+            introduced in 2.11.90.
+          </p>
+
+          <p>
+            Currently, userspace datapath does support conntrack
+            <code>timeout</code>.
+          </p>
+        </dd>
       </dl>
 
       <p>
