@@ -6505,7 +6505,7 @@ decode_NXAST_RAW_CT(const struct nx_action_conntrack *nac,
     conntrack->recirc_table = nac->recirc_table;
     conntrack->alg = ntohs(nac->alg);
     conntrack->timeout = ntohs(nac->timeout);
-    VLOG_INFO("yhwei:%s: timeout: %d\n", __func__, conntrack->timeout);
+    // VLOG_INFO("yhwei:%s: timeout: %d\n", __func__, conntrack->timeout);
 
     ofpbuf_pull(out, sizeof(*conntrack));
 
@@ -6566,7 +6566,7 @@ encode_CT(const struct ofpact_conntrack *conntrack,
     nac->recirc_table = conntrack->recirc_table;
     nac->alg = htons(conntrack->alg);
     nac->timeout = htons(conntrack->timeout);
-    VLOG_INFO("yhwei:%s: timeout: %d\n", __func__, nac->timeout);
+    // VLOG_INFO("yhwei:%s: timeout: %d\n", __func__, nac->timeout);
 
     len = ofpacts_put_openflow_actions(conntrack->actions,
                                        ofpact_ct_get_action_len(conntrack),
@@ -6621,7 +6621,7 @@ parse_CT(char *arg, const struct ofpact_parse_params *pp)
             error = str_to_connhelper(value, &oc->alg);
         } else if (!strcmp(key, "timeout")) {
             error = str_to_u16(value, "timeout", &oc->timeout);
-            VLOG_INFO("yhwei:%s: timeout: %d\n", __func__, oc->timeout);
+            // VLOG_INFO("yhwei:%s: timeout: %d\n", __func__, oc->timeout);
         } else if (!strcmp(key, "nat")) {
             const size_t nat_offset = ofpacts_pull(pp->ofpacts);
 
