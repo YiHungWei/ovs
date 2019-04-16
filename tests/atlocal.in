@@ -180,6 +180,8 @@ find_command()
 
 # Set HAVE_NC
 find_command nc
+# Set HAVE_NFCT
+find_command nfct
 
 # Determine correct netcat option to quit on stdin EOF
 if nc --version 2>&1 | grep -q nmap.org; then

@@ -5961,9 +5961,9 @@ put_ct_helper(struct xlate_ctx *ctx,
 static void
 put_ct_timeout(struct ofpbuf *odp_actions, struct ofpact_conntrack *ofc)
 {
-        VLOG_INFO("yhwei:%s:timeout = %d\n", __func__, ofc->timeout);
+        //VLOG_INFO("yhwei:%s:timeout = %d\n", __func__, ofc->timeout);
     if (ofc->timeout) {
-        VLOG_INFO("yhwei:%s:timeout = %d\n", __func__, ofc->timeout);
+        // VLOG_INFO("yhwei:%s:timeout = %d\n", __func__, ofc->timeout);
         struct ds s = DS_EMPTY_INITIALIZER;
         ds_put_format(&s, "%s%d", "ovs_timeout_", ofc->timeout);
         nl_msg_put_string(odp_actions, OVS_CT_ATTR_TIMEOUT, ds_cstr(&s));
