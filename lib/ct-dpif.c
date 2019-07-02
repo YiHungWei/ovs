@@ -761,6 +761,117 @@ ct_dpif_format_zone_limits(uint32_t default_limit,
     }
 }
 
+static const char *const ct_dpif_tp_attr_string[] = {
+#define CT_DPIF_TP_TCP_ATTR(ATTR) \
+    [CT_DPIF_TP_ATTR_TCP_##ATTR] = "TCP_"#ATTR,
+    CT_DPIF_TP_TCP_ATTRS
+#undef CT_DPIF_TP_TCP_ATTR
+#define CT_DPIF_TP_UDP_ATTR(ATTR) \
+    [CT_DPIF_TP_ATTR_UDP_##ATTR] = "UDP_"#ATTR,
+    CT_DPIF_TP_UDP_ATTRS
+#undef CT_DPIF_TP_UDP_ATTR
+#define CT_DPIF_TP_ICMP_ATTR(ATTR) \
+    [CT_DPIF_TP_ATTR_ICMP_##ATTR] = "ICMP_"#ATTR,
+    CT_DPIF_TP_ICMP_ATTRS
+#undef CT_DPIF_TP_ICMP_ATTR
+};
+
+static bool
+ct_dpif_set_timeout_policy_attr(struct ct_dpif_timeout_policy *tp,
+                                uint32_t attr, uint32_t value)
+{
+    if (tp->present & 1 << attr) {
+        /* Do we want to report error here? */
+        return false;
+    }
+    tp->attrs[attr] = value;
+    tp->present |= 1 << attr;
+    return true;
+}
+
+static bool
+ct_dpif_set_timeout_policy_attr__(struct ct_dpif_timeout_policy *tp,
+                                  uint32_t attr, uint32_t value)
+{
+    if (tp->present & 1 << attr && tp->attrs[attr] == value) {
+        return false;
+    }
+    tp->attrs[attr] = value;
+    tp->present |= 1 << attr;
+    return true;
+}
+
+/* Return true if the attributed is changed */
+bool
+ct_dpif_set_timeout_policy_attr_by_name(struct ct_dpif_timeout_policy *tp,
+                                        const char *key, uint32_t value)
+{
+    uint32_t i;
+
+    for (i = 0; i < CT_DPIF_TP_ATTR_MAX; ++i) {
+        if (!strcasecmp(key, ct_dpif_tp_attr_string[i])) {
+            return ct_dpif_set_timeout_policy_attr__(tp, i, value);
+        }
+    }
+    return false;
+}
+
+/* XXX: may be able to get rid of this since it is only used by dpctl */
+bool
+ct_dpif_parse_timeout_policy(struct ct_dpif_timeout_policy *tp,
+                             const char *key, const char *value)
+{
+    uint32_t i, val;
+
+    for (i = 0; i < CT_DPIF_TP_ATTR_MAX; ++i) {
+        if (!strcasecmp(key, ct_dpif_tp_attr_string[i])) {
+            if (!ovs_scan(value, "%"SCNu32, &val)) {
+                return false;
+            }
+            return ct_dpif_set_timeout_policy_attr(tp, i, val);
+        }
+    }
+    return false;
+}
+
+// XXX: may remove
+void ct_dpif_format_timeout_policy(struct ct_dpif_timeout_policy *tp,
+                                   struct ds *ds)
+{
+    bool first_entry = true;
+    int i;
+
+    if (tp->id) {
+        ds_put_format(ds, "Timeout policy %"PRIu32": ", tp->id);
+    } else {
+        ds_put_format(ds, "Timeout policy 0 (default): ");
+    }
+
+    for (i = 0; i < CT_DPIF_TP_ATTR_MAX; ++i) {
+        if (!first_entry) {
+            ds_put_format(ds, ", %s=", ct_dpif_tp_attr_string[i]);
+        } else {
+            first_entry = false;
+            ds_put_format(ds, "%s=", ct_dpif_tp_attr_string[i]);
+        }
+        if (tp->present & 1 << i) {
+            ds_put_format(ds, "%"PRIu32, tp->attrs[i]);
+        } else {
+            ds_put_cstr(ds, "N/A");
+        }
+    }
+}
+
+bool
+ct_dpif_timeout_policy_support_ipproto(uint8_t ipproto)
+{
+    if (ipproto == IPPROTO_TCP || ipproto == IPPROTO_UDP ||
+        ipproto == IPPROTO_ICMP|| ipproto == IPPROTO_ICMPV6) {
+        return true;
+    }
+    return false;
+}
+
 int
 ct_dpif_set_timeout_policy(struct dpif *dpif,
                            const struct ct_dpif_timeout_policy *tp,
