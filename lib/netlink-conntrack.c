@@ -1034,7 +1034,7 @@ nl_ct_set_timeout_policy(const struct nl_ct_timeout_policy *nl_tp)
     offset = nl_msg_start_nested(&buf, CTA_TIMEOUT_DATA);
     for (i = 1; i <= nl_ct_timeout_policy_max_attr[nl_tp->l4num]; ++i) {
         if (nl_tp->present & 1 << i) {
-            nl_msg_put_u32(&buf, i, htonl(nl_tp->attrs[i]));
+            nl_msg_put_be32(&buf, i, htonl(nl_tp->attrs[i]));
         }
     }
     nl_msg_end_nested(&buf, offset);
@@ -1062,7 +1062,7 @@ nl_ct_set_default_timeout_policy(const struct nl_ct_timeout_policy *nl_tp)
     offset = nl_msg_start_nested(&buf, CTA_TIMEOUT_DATA);
     for (i = 1; i <= nl_ct_timeout_policy_max_attr[nl_tp->l4num]; ++i) {
         if (nl_tp->present & 1 << i) {
-            nl_msg_put_u32(&buf, i, htonl(nl_tp->attrs[i]));
+            nl_msg_put_be32(&buf, i, htonl(nl_tp->attrs[i]));
         }
     }
     nl_msg_end_nested(&buf, offset);
