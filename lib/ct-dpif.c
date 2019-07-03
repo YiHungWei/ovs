@@ -772,7 +772,7 @@ const char *const ct_dpif_tp_attr_string[] = {
 };
 */
 
-const char *const ct_dpif_tp_attr_string[] = {
+static const char *const ct_dpif_tp_attr_string[] = {
 #define CT_DPIF_TP_TCP_ATTR(ATTR) \
     [CT_DPIF_TP_ATTR_TCP_##ATTR] = "TCP_"#ATTR,
     CT_DPIF_TP_TCP_ATTRS
