@@ -1197,7 +1197,6 @@ static void
 pre_get_dp(struct ctl_context *ctx)
 {
     ovsdb_idl_add_column(ctx->idl, &ovsrec_open_vswitch_col_datapaths);
-    ovsdb_idl_add_column(ctx->idl, &ovsrec_datapath_col_datapath_version);
 }
 
 static struct ovsrec_datapath *
@@ -1346,7 +1345,6 @@ pre_get_zone(struct ctl_context *ctx)
 {
     ovsdb_idl_add_column(ctx->idl, &ovsrec_open_vswitch_col_datapaths);
     ovsdb_idl_add_column(ctx->idl, &ovsrec_datapath_col_ct_zones);
-    ovsdb_idl_add_column(ctx->idl, &ovsrec_datapath_col_datapath_version);
     ovsdb_idl_add_column(ctx->idl, &ovsrec_ct_zone_col_timeout_policy);
     ovsdb_idl_add_column(ctx->idl, &ovsrec_ct_timeout_policy_col_timeouts);
 }
