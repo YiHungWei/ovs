@@ -792,6 +792,7 @@ ct_dpif_set_timeout_policy_attr(struct ct_dpif_timeout_policy *tp,
                                 uint32_t attr, uint32_t value)
 {
     if (tp->present & 1 << attr) {
+        /* Do we want to report error here? */
         return false;
     }
     tp->attrs[attr] = value;
@@ -799,6 +800,34 @@ ct_dpif_set_timeout_policy_attr(struct ct_dpif_timeout_policy *tp,
     return true;
 }
 
+static bool
+ct_dpif_set_timeout_policy_attr__(struct ct_dpif_timeout_policy *tp,
+                                  uint32_t attr, uint32_t value)
+{
+    if (tp->present & 1 << attr && tp->attrs[attr] == value) {
+        return false;
+    }
+    tp->attrs[attr] = value;
+    tp->present |= 1 << attr;
+    return true;
+}
+
+/* Return true if the attributed is changed */
+bool
+ct_dpif_set_timeout_policy_attr_by_name(struct ct_dpif_timeout_policy *tp,
+                                        const char *key, uint32_t value)
+{
+    uint32_t i;
+
+    for (i = 0; i < CT_DPIF_TP_ATTR_MAX; ++i) {
+        if (!strcasecmp(key, ct_dpif_tp_attr_string[i])) {
+            return ct_dpif_set_timeout_policy_attr__(tp, i, value);
+        }
+    }
+    return false;
+}
+
+/* XXX: may be able to get rid of this since it is only used by dpctl */
 bool
 ct_dpif_parse_timeout_policy(struct ct_dpif_timeout_policy *tp,
                              const char *key, const char *value)

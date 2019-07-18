@@ -336,6 +336,8 @@ bool ct_dpif_parse_zone_limit_tuple(const char *s, uint16_t *pzone,
                                     uint32_t *plimit, struct ds *);
 void ct_dpif_format_zone_limits(uint32_t default_limit,
                                 const struct ovs_list *, struct ds *);
+bool ct_dpif_set_timeout_policy_attr_by_name(struct ct_dpif_timeout_policy *tp,
+                                             const char *key, uint32_t value);
 bool ct_dpif_parse_timeout_policy(struct ct_dpif_timeout_policy *timeout,
                                   const char *key, const char *val);
 void ct_dpif_format_timeout_policy(struct ct_dpif_timeout_policy *timeout,
