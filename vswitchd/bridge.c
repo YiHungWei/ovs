@@ -179,6 +179,7 @@ struct ct_zone {
 struct datapath {
     struct hmap_node node;      /* In 'all_datapaths'. */
     char *type;                 /* Datapath type. */
+    char *dpif_backer_name;
     const struct ovsrec_datapath *cfg; // XXX: remove it if it is not useful
 
     struct cmap ct_zones;       /* "struct ct_zone"s indexed by zone id. */
@@ -2764,6 +2765,7 @@ datapath_create(const struct ovsrec_datapath *dp_cfg, const char *type)
     dp = xzalloc(sizeof *dp);
 
     dp->type = xstrdup(type);
+    dp->dpif_backer_name = xasprintf("ovs-%s", type);
     dp->cfg = dp_cfg;
 
     cmap_init(&dp->ct_zones);
@@ -2780,22 +2782,30 @@ datapath_destroy(struct datapath *dp)
 {
     struct ct_zone *zone;
     struct ct_timeout_policy *tp;
+    struct dpif *dpif;
 
     if (dp) {
         CMAP_FOR_EACH (zone, node, &dp->ct_zones) {
             cmap_remove(&dp->ct_zones, &zone->node, hash_int(zone->id, 0));
             ovsrcu_postpone(free, zone);
         }
+
+        dpif_open(dp->dpif_backer_name, dp->type, &dpif);
+
         CMAP_FOR_EACH (tp, node, &dp->ct_tps) {
-            // XXX: remove timeout policies in the datapath
             cmap_remove(&dp->ct_tps, &tp->node, uuid_hash(&tp->uuid));
+            if (dpif) {
+                ct_dpif_del_timeout_policy(dpif, tp->cdtp.id);
+            }
             ovsrcu_postpone(free, tp);
         }
 
+        dpif_close(dpif);
         hmap_remove(&all_datapaths, &dp->node);
         cmap_destroy(&dp->ct_zones);
         cmap_destroy(&dp->ct_tps);
         free(dp->type);
+        free(dp->dpif_backer_name);
         free(dp);
     }
 }
@@ -2914,7 +2924,7 @@ ct_timeout_policy_update(struct ovsrec_ct_timeout_policy *tp_cfg,
 }
 
 static void
-datapath_update_ct_zone_config(struct datapath *dp)
+datapath_update_ct_zone_config(struct datapath *dp, struct dpif *dpif)
 {
     const struct ovsrec_datapath *dp_cfg = dp->cfg;
     struct ovsrec_ct_timeout_policy *tp_cfg;
@@ -2925,7 +2935,6 @@ datapath_update_ct_zone_config(struct datapath *dp)
     bool new_zone;
     size_t i;
 
-   
     // 1. loop through all ct_zones in dp
     for (i = 0; i < dp_cfg->n_ct_zones; i++) {
         /* Update ct_zone config */
@@ -2946,9 +2955,14 @@ datapath_update_ct_zone_config(struct datapath *dp)
         if (!tp) {
             tp = ct_timeout_policy_alloc(tp_cfg);
             cmap_insert(&dp->ct_tps, &tp->node, uuid_hash(&tp->uuid));
+            if (dpif) {
+                ct_dpif_set_timeout_policy(dpif, &tp->cdtp);
+            }
         } else {
             if (ct_timeout_policy_update(tp_cfg, tp)) {
-                // XXX: Update to datapath if it is changed
+                if (dpif) {
+                    ct_dpif_set_timeout_policy(dpif, &tp->cdtp);
+                }
             }
         }
         tp->seqno = idl_seqno;
@@ -2959,19 +2973,21 @@ datapath_update_ct_zone_config(struct datapath *dp)
             cmap_insert(&dp->ct_zones, &zone->node, hash_int(zone_id, 0));
         }
     }
-
 }
 
 static void
 reconfigure_datapath(const struct ovsrec_open_vswitch *cfg)
 {
-    struct datapath *dp;
-    struct ct_zone *zone;
     struct ct_timeout_policy *tp;
+    struct ct_zone *zone;
+    struct datapath *dp;
+    struct dpif *dpif;
 
     add_del_datapaths(cfg);
     HMAP_FOR_EACH (dp, node, &all_datapaths) {
-        datapath_update_ct_zone_config(dp);
+        dpif_open(dp->dpif_backer_name, dp->type, &dpif);
+
+        datapath_update_ct_zone_config(dp, dpif);
 
         /* Garbage colleciton */
         CMAP_FOR_EACH (zone, node, &dp->ct_zones) {
@@ -2985,12 +3001,16 @@ reconfigure_datapath(const struct ovsrec_open_vswitch *cfg)
         CMAP_FOR_EACH (tp, node, &dp->ct_tps) {
             if (tp->seqno != idl_seqno) {
                 // XXX: move out as a separate func
-                // XXX: remove tp from datapath
                 VLOG_ERR("Remove unneeded tp id: %d", tp->cdtp.id);
                 cmap_remove(&dp->ct_tps, &tp->node, uuid_hash(&tp->uuid));
                 ovsrcu_postpone(free, tp);
+                if (dpif) {
+                    ct_dpif_del_timeout_policy(dpif, tp->cdtp.id);
+                }
             }
         }
+
+        dpif_close(dpif);
     }
 
     /* garbagage colleciton */
