@@ -171,8 +171,8 @@ struct ct_zone {
     uint16_t id;
     unsigned int seqno;
 
-    struct uuid tp_id;          /* uuid that identifies a timeout policy in
-                                 * struct datapaths's "ct_tps cmap. */
+    struct uuid tp_uuid;          /* uuid that identifies a timeout policy in
+                                   * struct datapaths's "ct_tps cmap. */
     // struct datapath *datapath;  // XXX: not sure if needed?
 };
 
@@ -2968,7 +2968,7 @@ datapath_update_ct_zone_config(struct datapath *dp, struct dpif *dpif)
         tp->seqno = idl_seqno;
 
         /* Link zone with new timeout policy */
-        zone->tp_id = tp_cfg->header_.uuid;
+        zone->tp_uuid = tp_cfg->header_.uuid;
         if (new_zone) {
             cmap_insert(&dp->ct_zones, &zone->node, hash_int(zone_id, 0));
         }
@@ -3019,6 +3019,33 @@ reconfigure_datapath(const struct ovsrec_open_vswitch *cfg)
         3.1 Loop through all zones, check if it is in wanted zones
         3.2 loop through all tps, check if it is in wanted tps
     */
+}
+
+bool
+datapath_get_zone_timeout_policy_id(const char *dp_type, uint16_t zone_id,
+                                    uint32_t *tp_id)
+{
+    struct datapath *dp;
+    struct ct_zone *ct_zone;
+    struct ct_timeout_policy *ct_tp;
+
+    dp = datapath_lookup(dp_type);
+    if (!dp) {
+        return false;
+    }
+
+    ct_zone = ct_zone_lookup(&dp->ct_zones, zone_id);
+    if (!ct_zone) {
+        return false;
+    }
+
+    ct_tp = ct_timeout_policy_lookup(&dp->ct_tps, &ct_zone->tp_uuid);
+    if (!ct_tp) {
+        return false;
+    }
+
+    *tp_id = ct_tp->cdtp.id;
+    return true;
 }
 
 static void
