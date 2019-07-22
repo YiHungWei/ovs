@@ -4,6 +4,7 @@
 #include <net/netfilter/nf_conntrack_timeout.h>
 
 #ifdef CONFIG_NF_CONNTRACK_TIMEOUT
+#ifndef HAVE_NF_CT_SET_TIMEOUT
 static void rpl__nf_ct_timeout_put(struct nf_ct_timeout *timeout)
 {
 	typeof(nf_ct_timeout_put_hook) timeout_put;
@@ -97,4 +98,5 @@ void rpl_nf_ct_destroy_timeout(struct nf_conn *ct)
 }
 EXPORT_SYMBOL_GPL(rpl_nf_ct_destroy_timeout);
 
+#endif /* HAVE_NF_CT_SET_TIMEOUT */
 #endif /* CONFIG_NF_CONNTRACK_TIMEOUT */
