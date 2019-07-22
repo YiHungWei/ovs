@@ -503,7 +503,8 @@ struct dpif_class {
 
     /* XXX: Add comments */
     int (*ct_set_timeout_policy)(struct dpif *,
-                                 const struct ct_dpif_timeout_policy *tp);
+                                 const struct ct_dpif_timeout_policy *tp,
+                                 bool is_default);
     int (*ct_get_timeout_policy)(struct dpif *,
                                  struct ct_dpif_timeout_policy *tp);
     int (*ct_del_timeout_policy)(struct dpif *, uint32_t tp_id);

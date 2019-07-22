@@ -1973,7 +1973,7 @@ dpctl_ct_set_tp(int argc, const char *argv[], struct dpctl_params *dpctl_p)
         goto error;
     }
 
-    err = ct_dpif_set_timeout_policy(dpif, &tp);
+    err = ct_dpif_set_timeout_policy(dpif, &tp, tp.id == 0 ? true : false);
     if (err) {
         ds_put_format(&ds, "Failed to set timeout policy %"PRIu32, tp.id);
     } else {

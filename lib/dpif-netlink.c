@@ -3248,7 +3248,8 @@ dpif_netlink_set_ct_dpif_tp_attrs(const struct nl_ct_timeout_policy *nl_tp,
 
 static int
 dpif_netlink_ct_set_timeout_policy(struct dpif *dpif OVS_UNUSED,
-                                   const struct ct_dpif_timeout_policy *tp)
+                                   const struct ct_dpif_timeout_policy *tp,
+                                   bool is_default)
 {
 #ifdef _WIN32
     return EOPNOTSUPP;
@@ -3264,11 +3265,11 @@ dpif_netlink_ct_set_timeout_policy(struct dpif *dpif OVS_UNUSED,
         nl_tp.l3num = tp_protos[i].l3num;
         nl_tp.l4num = tp_protos[i].l4num;
         dpif_netlink_get_nl_tp_attrs(tp, tp_protos[i].l4num, &nl_tp);
-        if (tp->id) {
+        if (!is_default) {
             err = nl_ct_set_timeout_policy(&nl_tp);
         } else if (tp_protos[i].l3num == AF_INET) {
-            /* The default timeout 0 is shared between AF_INET and AF_INET6
-             * in the kernel. So configure AF_INET is sufficient. */
+            /* The default timeout policy is shared between AF_INET and
+             * AF_INET6 in the kernel. So configure AF_INET is sufficient. */
             err = nl_ct_set_default_timeout_policy(&nl_tp);
         }
         if (err) {

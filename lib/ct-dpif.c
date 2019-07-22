@@ -895,10 +895,11 @@ ct_dpif_timeout_policy_support_ipproto(uint8_t ipproto)
 
 int
 ct_dpif_set_timeout_policy(struct dpif *dpif,
-                           const struct ct_dpif_timeout_policy *tp)
+                           const struct ct_dpif_timeout_policy *tp,
+                           bool is_default)
 {
     return (dpif->dpif_class->ct_set_timeout_policy
-            ? dpif->dpif_class->ct_set_timeout_policy(dpif, tp)
+            ? dpif->dpif_class->ct_set_timeout_policy(dpif, tp, is_default)
             : EOPNOTSUPP);
 }
 
