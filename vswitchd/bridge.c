@@ -159,7 +159,8 @@ struct ct_timeout_policy {
     struct cmap_node node;      /* Element in struct datapath's
                                  * "ct_timeout_policies" cmap. */
     struct uuid uuid;
-    unsigned int seqno;
+    unsigned int last_used_seqno;
+    unsigned int last_updated_seqno;
 
     struct ct_dpif_timeout_policy cdtp;
     const struct ovsrec_ct_timeout_policy *tp_cfg;
@@ -2899,7 +2900,7 @@ ct_timeout_policy_alloc(struct ovsrec_ct_timeout_policy *tp_cfg)
             tp_cfg->key_timeouts[i], tp_cfg->value_timeouts[i]);
     }
     tp->cdtp.id = idl_seqno;
-    tp->seqno = idl_seqno;
+    tp->last_updated_seqno = idl_seqno;
 
     // debug, print out the new tp
     struct ds ds = DS_EMPTY_INITIALIZER;
@@ -2919,6 +2920,9 @@ ct_timeout_policy_update(struct ovsrec_ct_timeout_policy *tp_cfg,
     for (i = 0; i < tp_cfg->n_timeouts; i++) {
         changed |= ct_dpif_set_timeout_policy_attr_by_name(&tp->cdtp,
                         tp_cfg->key_timeouts[i], tp_cfg->value_timeouts[i]);
+    }
+    if (changed) {
+        tp->last_updated_seqno = idl_seqno;
     }
     return changed;
 }
@@ -2956,16 +2960,20 @@ datapath_update_ct_zone_config(struct datapath *dp, struct dpif *dpif)
             tp = ct_timeout_policy_alloc(tp_cfg);
             cmap_insert(&dp->ct_tps, &tp->node, uuid_hash(&tp->uuid));
             if (dpif) {
-                ct_dpif_set_timeout_policy(dpif, &tp->cdtp);
+                ct_dpif_set_timeout_policy(dpif, &tp->cdtp, false);
             }
         } else {
             if (ct_timeout_policy_update(tp_cfg, tp)) {
                 if (dpif) {
-                    ct_dpif_set_timeout_policy(dpif, &tp->cdtp);
+                    ct_dpif_set_timeout_policy(dpif, &tp->cdtp, false);
                 }
             }
         }
-        tp->seqno = idl_seqno;
+        tp->last_used_seqno = idl_seqno;
+
+        if (!zone_id && tp->last_updated_seqno == idl_seqno) {
+            ct_dpif_set_timeout_policy(dpif, &tp->cdtp, true);
+        }
 
         /* Link zone with new timeout policy */
         zone->tp_uuid = tp_cfg->header_.uuid;
@@ -2999,7 +3007,7 @@ reconfigure_datapath(const struct ovsrec_open_vswitch *cfg)
             }
         }
         CMAP_FOR_EACH (tp, node, &dp->ct_tps) {
-            if (tp->seqno != idl_seqno) {
+            if (tp->last_used_seqno != idl_seqno) {
                 // XXX: move out as a separate func
                 VLOG_ERR("Remove unneeded tp id: %d", tp->cdtp.id);
                 cmap_remove(&dp->ct_tps, &tp->node, uuid_hash(&tp->uuid));
