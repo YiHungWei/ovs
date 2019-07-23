@@ -52,6 +52,7 @@ struct ovs_list;
 struct lldp_status;
 struct aa_settings;
 struct aa_mapping_settings;
+struct ovsrec_datapath;
 
 /* Needed for the lock annotations. */
 extern struct ovs_mutex ofproto_mutex;
@@ -362,6 +363,11 @@ int ofproto_get_stp_status(struct ofproto *, struct ofproto_stp_status *);
 int ofproto_set_rstp(struct ofproto *, const struct ofproto_rstp_settings *);
 int ofproto_get_rstp_status(struct ofproto *, struct ofproto_rstp_status *);
 void ofproto_set_vlan_limit(int vlan_limit);
+void ofproto_ct_set_zone_timeout_policy(const char *datapath_type,
+                                        uint16_t zone,
+                                        struct simap *timeout_policy);
+void ofproto_ct_del_zone_timeout_policy(const char *datapath_type,
+                                        uint16_t zone);
 
 /* Configuration of ports. */
 void ofproto_port_unregister(struct ofproto *, ofp_port_t ofp_port);
