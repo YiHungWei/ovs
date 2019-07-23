@@ -5688,11 +5688,12 @@ ovs-vsctl add-port br0 p0 -- set Interface p0 type=patch options:peer=p1 \
           First UDP packet timeout.
         </column>
 
-        <column name="timeouts" key="udp_multiple">
-          Multiple UDP packet timeout.
+        <column name="timeouts" key="udp_single">
+          The timeout in the state that source host sends more than one packet
+          but the destination host has never sent one backs.
         </column>
 
-        <column name="timeouts" key="udp_bidirectional">
+        <column name="timeouts" key="udp_multiple">
           UDP packets seen in both directions timeout.
         </column>
       </group>

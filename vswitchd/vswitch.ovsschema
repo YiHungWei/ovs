@@ -1,6 +1,6 @@
 {"name": "Open_vSwitch",
  "version": "8.2.0",
- "cksum": "1457808868 25387",
+ "cksum": "2203523463 25517",
  "tables": {
    "Open_vSwitch": {
      "columns": {
@@ -660,7 +660,10 @@
    "CT_Timeout_Policy": {
      "columns": {
        "timeouts": {
-         "type": {"key": "string", "value": "integer",
+         "type": {"key": "string",
+                  "value": {"type" : "integer",
+                            "minInteger" : 0,
+                            "maxInteger" : 4294967295},
                   "min": 0, "max": "unlimited"}},
        "external_ids": {
          "type": {"key": "string", "value": "string",
