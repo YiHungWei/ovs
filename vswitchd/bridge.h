@@ -17,6 +17,7 @@
 #define VSWITCHD_BRIDGE_H 1
 
 #include <stdbool.h>
+#include <inttypes.h>
 
 struct simap;
 
@@ -27,5 +28,7 @@ void bridge_run(void);
 void bridge_wait(void);
 
 void bridge_get_memory_usage(struct simap *usage);
+
+bool datapath_get_zone_timeout_policy_id(const char *dp_type, uint16_t zone, uint32_t *tp_id);
 
 #endif /* bridge.h */
