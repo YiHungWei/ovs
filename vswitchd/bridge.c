@@ -23,8 +23,10 @@
 #include "bfd.h"
 #include "bitmap.h"
 #include "cfm.h"
+#include "cmap.h"
 #include "connectivity.h"
 #include "coverage.h"
+#include "ct-dpif.h"
 #include "daemon.h"
 #include "dirs.h"
 #include "dpif.h"
@@ -153,8 +155,44 @@ struct aa_mapping {
     char *br_name;
 };
 
+struct ct_timeout_policy {
+    struct cmap_node node;      /* Element in struct datapath's
+                                 * "ct_timeout_policies" cmap. */
+    struct uuid uuid;
+    unsigned int last_used_seqno;
+    unsigned int last_updated_seqno;
+
+    struct ct_dpif_timeout_policy cdtp;
+    const struct ovsrec_ct_timeout_policy *tp_cfg;
+};
+
+struct ct_zone {
+    struct cmap_node node;      /* Element in struct datapath's "ct_zones"
+                                 * cmap. */
+    uint16_t id;
+    unsigned int seqno;
+
+    struct uuid tp_uuid;          /* uuid that identifies a timeout policy in
+                                   * struct datapaths's "ct_tps cmap. */
+    // struct datapath *datapath;  // XXX: not sure if needed?
+};
+
+struct datapath {
+    struct hmap_node node;      /* In 'all_datapaths'. */
+    char *type;                 /* Datapath type. */
+    char *dpif_backer_name;
+    const struct ovsrec_datapath *cfg; // XXX: remove it if it is not useful
+
+    struct cmap ct_zones;       /* "struct ct_zone"s indexed by zone id. */
+    struct cmap ct_tps;         /* "struct ct_timeout_policy"s indexed by uuid. */
+};
+
 /* All bridges, indexed by name. */
 static struct hmap all_bridges = HMAP_INITIALIZER(&all_bridges);
+
+/* All datapaths, indexed by type. */
+// XXX: How to let ofproto to look up this data structure?
+static struct hmap all_datapaths = HMAP_INITIALIZER(&all_datapaths);
 
 /* OVSDB IDL used to obtain configuration. */
 static struct ovsdb_idl *idl;
@@ -285,6 +323,7 @@ static void port_configure_bond(struct port *, struct bond_settings *);
 static bool port_is_synthetic(const struct port *);
 
 static void reconfigure_system_stats(const struct ovsrec_open_vswitch *);
+static void reconfigure_datapath(const struct ovsrec_open_vswitch *);
 static void run_system_stats(void);
 
 static void bridge_configure_mirrors(struct bridge *);
@@ -321,6 +360,7 @@ static ofp_port_t iface_get_requested_ofp_port(
     const struct ovsrec_interface *);
 static ofp_port_t iface_pick_ofport(const struct ovsrec_interface *);
 
+static void datapath_destroy(struct datapath *dp);
 
 static void discover_types(const struct ovsrec_open_vswitch *cfg);
 
@@ -502,12 +542,17 @@ void
 bridge_exit(bool delete_datapath)
 {
     struct bridge *br, *next_br;
+    struct datapath *dp, *next_dp;
 
     if_notifier_destroy(ifnotifier);
     seq_destroy(ifaces_changed);
     HMAP_FOR_EACH_SAFE (br, next_br, node, &all_bridges) {
         bridge_destroy(br, delete_datapath);
     }
+    HMAP_FOR_EACH_SAFE (dp, next_dp, node, &all_datapaths) {
+        datapath_destroy(dp);
+    }
+
     ovsdb_idl_destroy(idl);
 }
 
@@ -669,6 +714,7 @@ bridge_reconfigure(const struct ovsrec_open_vswitch *ovs_cfg)
     }
 
     reconfigure_system_stats(ovs_cfg);
+    reconfigure_datapath(ovs_cfg);
 
     /* Complete the configuration. */
     sflow_bridge_number = 0;
@@ -2702,6 +2748,312 @@ reconfigure_system_stats(const struct ovsrec_open_vswitch *cfg)
     if (!enable) {
         ovsrec_open_vswitch_set_statistics(cfg, NULL);
     }
+}
+
+static struct datapath *
+datapath_lookup(const char *type)
+{
+    struct datapath *dp;
+
+    HMAP_FOR_EACH_WITH_HASH (dp, node, hash_string(type, 0), &all_datapaths) {
+        if (!strcmp(dp->type, type)) {
+            return dp;
+        }
+    }
+    return NULL;
+}
+
+static void
+datapath_clear_timeout_policy(struct datapath *dp)
+{
+    struct ct_dpif_timeout_policy *tp;
+    struct dpif *dpif;
+    void *state;
+    int err;
+
+    dpif_open(dp->dpif_backer_name, dp->type, &dpif);
+    ct_dpif_timeout_policy_dump_start(dpif, &state);
+
+    while(!(err = ct_dpif_timeout_policy_dump_next(dpif, state, &tp))) {
+        ct_dpif_del_timeout_policy(dpif, tp->id);
+        free(tp);
+    }
+
+    ct_dpif_timeout_policy_dump_done(dpif, state);
+    dpif_close(dpif);
+}
+
+static struct datapath *
+datapath_create(const struct ovsrec_datapath *dp_cfg, const char *type)
+{
+    struct datapath *dp;
+
+    ovs_assert(!datapath_lookup(type));
+    dp = xzalloc(sizeof *dp);
+
+    dp->type = xstrdup(type);
+    dp->dpif_backer_name = xasprintf("ovs-%s", type);
+    dp->cfg = dp_cfg;
+
+    cmap_init(&dp->ct_zones);
+    cmap_init(&dp->ct_tps);
+
+    hmap_insert(&all_datapaths, &dp->node, hash_string(dp->type, 0));
+
+    datapath_clear_timeout_policy(dp);
+
+    return dp;
+}
+
+static void
+datapath_destroy(struct datapath *dp)
+{
+    struct ct_zone *zone;
+    struct ct_timeout_policy *tp;
+    struct dpif *dpif;
+
+    if (dp) {
+        CMAP_FOR_EACH (zone, node, &dp->ct_zones) {
+            cmap_remove(&dp->ct_zones, &zone->node, hash_int(zone->id, 0));
+            ovsrcu_postpone(free, zone);
+        }
+
+        dpif_open(dp->dpif_backer_name, dp->type, &dpif);
+
+        CMAP_FOR_EACH (tp, node, &dp->ct_tps) {
+            cmap_remove(&dp->ct_tps, &tp->node, uuid_hash(&tp->uuid));
+            if (dpif) {
+                ct_dpif_del_timeout_policy(dpif, tp->cdtp.id);
+            }
+            ovsrcu_postpone(free, tp);
+        }
+
+        dpif_close(dpif);
+        hmap_remove(&all_datapaths, &dp->node);
+        cmap_destroy(&dp->ct_zones);
+        cmap_destroy(&dp->ct_tps);
+        free(dp->type);
+        free(dp->dpif_backer_name);
+        free(dp);
+    }
+}
+
+static void
+add_del_datapaths(const struct ovsrec_open_vswitch *cfg)
+{
+    struct datapath *dp, *next;
+    struct shash_node *node;
+    struct shash new_dp;
+    size_t i;
+
+    /* Collect new datapaths' type. */
+    shash_init(&new_dp);
+    for (i = 0; i < cfg->n_datapaths; i++) {
+        const struct ovsrec_datapath *dp_cfg = cfg->value_datapaths[i];
+        char *key = cfg->key_datapaths[i];
+
+        // XXX: Is this check required ?
+        if (!strcmp(key, "system") || !strcmp(key, "netdev")) {
+            shash_add(&new_dp, key, dp_cfg);
+        }
+    }
+
+    /* Get rid of deleted datapath. */
+    HMAP_FOR_EACH_SAFE (dp, next, node, &all_datapaths) {
+        dp->cfg = shash_find_data(&new_dp, dp->type);
+        if (!dp->cfg) {
+            datapath_destroy(dp);
+        }
+    }
+
+    /* Add new datapaths */
+    SHASH_FOR_EACH(node, &new_dp) {
+        const struct ovsrec_datapath *dp_cfg = node->data;
+        if (!datapath_lookup(node->name)) {
+            datapath_create(dp_cfg, node->name);
+        }
+    }
+
+    shash_destroy(&new_dp);
+}
+
+static struct ct_zone *
+ct_zone_lookup(struct cmap *ct_zones, uint16_t zone_id)
+{
+    struct ct_zone *zone;
+
+    CMAP_FOR_EACH_WITH_HASH (zone, node, hash_int(zone_id, 0), ct_zones) {
+        if (zone->id == zone_id) {
+            return zone;
+        }
+    }
+    return NULL;
+}
+
+static struct ct_timeout_policy *
+ct_timeout_policy_lookup(struct cmap *ct_tps, struct uuid *uuid)
+{
+    struct ct_timeout_policy *tp;
+
+    CMAP_FOR_EACH_WITH_HASH (tp, node, uuid_hash(uuid), ct_tps) {
+        if (uuid_equals(&tp->uuid, uuid)) {
+            return tp;
+        }
+    }
+    return NULL;
+}
+
+static struct ct_zone *
+ct_zone_alloc(const struct ovsrec_ct_zone *zone_cfg OVS_UNUSED /* XXX */, uint16_t zone_id)
+{
+    struct ct_zone *zone;
+
+    zone = xzalloc(sizeof *zone);
+    zone->id = zone_id;
+
+    return zone;
+}
+
+static struct ct_timeout_policy *
+ct_timeout_policy_alloc(struct ovsrec_ct_timeout_policy *tp_cfg)
+{
+    struct ct_timeout_policy *tp;
+    size_t i;
+
+    tp = xzalloc(sizeof *tp);
+    tp->uuid = tp_cfg->header_.uuid;
+    for (i = 0; i < tp_cfg->n_timeouts; i++) {
+        ct_dpif_set_timeout_policy_attr_by_name(&tp->cdtp,
+            tp_cfg->key_timeouts[i], tp_cfg->value_timeouts[i]);
+    }
+    tp->cdtp.id = idl_seqno;
+    tp->last_updated_seqno = idl_seqno;
+
+    // debug, print out the new tp
+    struct ds ds = DS_EMPTY_INITIALIZER;
+    ct_dpif_format_timeout_policy(&tp->cdtp, &ds);
+    VLOG_ERR("New timeout policy: %s", ds_cstr(&ds));
+
+    return tp;
+}
+
+static bool
+ct_timeout_policy_update(struct ovsrec_ct_timeout_policy *tp_cfg,
+                         struct ct_timeout_policy *tp)
+{
+    size_t i;
+    bool changed = false;
+
+    for (i = 0; i < tp_cfg->n_timeouts; i++) {
+        changed |= ct_dpif_set_timeout_policy_attr_by_name(&tp->cdtp,
+                        tp_cfg->key_timeouts[i], tp_cfg->value_timeouts[i]);
+    }
+    if (changed) {
+        tp->last_updated_seqno = idl_seqno;
+    }
+    return changed;
+}
+
+static void
+datapath_update_ct_zone_config(struct datapath *dp, struct dpif *dpif)
+{
+    const struct ovsrec_datapath *dp_cfg = dp->cfg;
+    struct ovsrec_ct_timeout_policy *tp_cfg;
+    struct ovsrec_ct_zone *zone_cfg;
+    struct ct_timeout_policy *tp;
+    struct ct_zone *zone;
+    uint16_t zone_id;
+    bool new_zone;
+    size_t i;
+
+    // 1. loop through all ct_zones in dp
+    for (i = 0; i < dp_cfg->n_ct_zones; i++) {
+        /* Update ct_zone config */
+        zone_cfg = dp_cfg->value_ct_zones[i];
+        zone_id = dp_cfg->key_ct_zones[i];
+        zone = ct_zone_lookup(&dp->ct_zones, zone_id);
+        if (!zone) {
+            new_zone = true;
+            zone = ct_zone_alloc(zone_cfg, zone_id);
+        } else {
+            new_zone = false;
+        }
+        zone->seqno = idl_seqno;
+
+        /* Update timeout policy */
+        tp_cfg = zone_cfg->timeout_policy;
+        tp = ct_timeout_policy_lookup(&dp->ct_tps, &tp_cfg->header_.uuid);
+        if (!tp) {
+            tp = ct_timeout_policy_alloc(tp_cfg);
+            cmap_insert(&dp->ct_tps, &tp->node, uuid_hash(&tp->uuid));
+            if (dpif) {
+                ct_dpif_set_timeout_policy(dpif, &tp->cdtp, false);
+            }
+        } else {
+            if (ct_timeout_policy_update(tp_cfg, tp)) {
+                if (dpif) {
+                    ct_dpif_set_timeout_policy(dpif, &tp->cdtp, false);
+                }
+            }
+        }
+        tp->last_used_seqno = idl_seqno;
+
+        if (!zone_id && tp->last_updated_seqno == idl_seqno) {
+            ct_dpif_set_timeout_policy(dpif, &tp->cdtp, true);
+        }
+
+        /* Link zone with new timeout policy */
+        zone->tp_uuid = tp_cfg->header_.uuid;
+        if (new_zone) {
+            cmap_insert(&dp->ct_zones, &zone->node, hash_int(zone_id, 0));
+        }
+    }
+}
+
+static void
+reconfigure_datapath(const struct ovsrec_open_vswitch *cfg)
+{
+    struct ct_timeout_policy *tp;
+    struct ct_zone *zone;
+    struct datapath *dp;
+    struct dpif *dpif;
+
+    add_del_datapaths(cfg);
+    HMAP_FOR_EACH (dp, node, &all_datapaths) {
+        dpif_open(dp->dpif_backer_name, dp->type, &dpif);
+
+        datapath_update_ct_zone_config(dp, dpif);
+
+        /* Garbage colleciton */
+        CMAP_FOR_EACH (zone, node, &dp->ct_zones) {
+            if (zone->seqno != idl_seqno) {
+                // XXX: move out as a separte func
+                VLOG_ERR("Remove unneeded zone: %d", zone->id);
+                cmap_remove(&dp->ct_zones, &zone->node, hash_int(zone->id, 0));
+                ovsrcu_postpone(free, zone);
+            }
+        }
+        CMAP_FOR_EACH (tp, node, &dp->ct_tps) {
+            if (tp->last_used_seqno != idl_seqno) {
+                // XXX: move out as a separate func
+                VLOG_ERR("Remove unneeded tp id: %d", tp->cdtp.id);
+                cmap_remove(&dp->ct_tps, &tp->node, uuid_hash(&tp->uuid));
+                ovsrcu_postpone(free, tp);
+                if (dpif) {
+                    ct_dpif_del_timeout_policy(dpif, tp->cdtp.id);
+                }
+            }
+        }
+
+        dpif_close(dpif);
+    }
+
+    /* garbagage colleciton */
+    /*
+        3.  GC
+        3.1 Loop through all zones, check if it is in wanted zones
+        3.2 loop through all tps, check if it is in wanted tps
+    */
 }
 
 static void
