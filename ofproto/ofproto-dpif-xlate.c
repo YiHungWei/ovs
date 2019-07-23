@@ -28,12 +28,15 @@
 #include "bond.h"
 #include "bundle.h"
 #include "byte-order.h"
+#include "ct-dpif.h"
 #include "cfm.h"
 #include "connmgr.h"
 #include "coverage.h"
 #include "csum.h"
+#include "datapath-config.h"
 #include "dp-packet.h"
 #include "dpif.h"
+#include "dpif-netlink.h"
 #include "in-band.h"
 #include "lacp.h"
 #include "learn.h"
@@ -5977,6 +5980,27 @@ put_ct_helper(struct xlate_ctx *ctx,
 }
 
 static void
+put_ct_timeout(struct ofpbuf *odp_actions, const char *dp_type,
+               const struct flow *flow, struct flow_wildcards *wc,
+               uint16_t zone_id)
+{
+    uint32_t tp_id;
+
+    if (datapath_get_zone_timeout_policy_id(dp_type, zone_id, &tp_id)) {
+        if (ct_dpif_timeout_policy_support_ipproto(flow->nw_proto)) {
+            struct ds ds = DS_EMPTY_INITIALIZER;
+
+            dpif_netlink_format_tp_name(tp_id,
+                flow->dl_type == htons(ETH_TYPE_IP) ? AF_INET : AF_INET6,
+                flow->nw_proto, &ds);
+            memset(&wc->masks.nw_proto, 0xff, sizeof wc->masks.nw_proto);
+            nl_msg_put_string(odp_actions, OVS_CT_ATTR_TIMEOUT, ds_cstr(&ds));
+            ds_destroy(&ds);
+        }
+    }
+}
+
+static void
 put_ct_nat(struct xlate_ctx *ctx)
 {
     struct ofpact_nat *ofn = ctx->ct_nat_action;
@@ -6071,6 +6095,8 @@ compose_conntrack_action(struct xlate_ctx *ctx, struct ofpact_conntrack *ofc,
     put_ct_mark(&ctx->xin->flow, ctx->odp_actions, ctx->wc);
     put_ct_label(&ctx->xin->flow, ctx->odp_actions, ctx->wc);
     put_ct_helper(ctx, ctx->odp_actions, ofc);
+    put_ct_timeout(ctx->odp_actions, ctx->xbridge->ofproto->backer->type,
+                   &ctx->xin->flow, ctx->wc, zone);
     put_ct_nat(ctx);
     ctx->ct_nat_action = NULL;
     nl_msg_end_nested(ctx->odp_actions, ct_offset);
