@@ -51,13 +51,12 @@
 #define NLM_F_ECHO              0x008
 
 #define NLM_F_ROOT              0x100
+#define NLM_F_REPLACE           0x100
 #define NLM_F_MATCH             0x200
 #define NLM_F_EXCL              0x200
 #define NLM_F_ATOMIC            0x400
 #define NLM_F_CREATE            0x400
 #define NLM_F_DUMP              (NLM_F_ROOT | NLM_F_MATCH)
-
-#define NLM_F_REPLACE           0x100
 
 /* nlmsg_type values. */
 #define NLMSG_NOOP              1
