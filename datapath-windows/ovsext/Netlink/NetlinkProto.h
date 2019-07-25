@@ -57,6 +57,8 @@
 #define NLM_F_CREATE            0x400
 #define NLM_F_DUMP              (NLM_F_ROOT | NLM_F_MATCH)
 
+#define NLM_F_REPLACE           0x100
+
 /* nlmsg_type values. */
 #define NLMSG_NOOP              1
 #define NLMSG_ERROR             2
