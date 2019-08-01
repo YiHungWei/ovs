@@ -5977,6 +5977,25 @@ put_ct_helper(struct xlate_ctx *ctx,
 }
 
 static void
+put_ct_timeout(struct ofpbuf *odp_actions, const struct dpif_backer *backer,
+               const struct flow *flow, struct flow_wildcards *wc,
+               uint16_t zone_id)
+{
+    struct ds tp_name = DS_EMPTY_INITIALIZER;
+    bool unwildcard;
+
+    if (ofproto_dpif_ct_zone_timeout_policy_get_name(backer, zone_id,
+            ntohs(flow->dl_type), flow->nw_proto, &tp_name, &unwildcard)) {
+        nl_msg_put_string(odp_actions, OVS_CT_ATTR_TIMEOUT, ds_cstr(&tp_name));
+
+        if (unwildcard) {
+                memset(&wc->masks.nw_proto, 0xff, sizeof wc->masks.nw_proto);
+        }
+    }
+    ds_destroy(&tp_name);
+}
+
+static void
 put_ct_nat(struct xlate_ctx *ctx)
 {
     struct ofpact_nat *ofn = ctx->ct_nat_action;
@@ -6071,6 +6090,10 @@ compose_conntrack_action(struct xlate_ctx *ctx, struct ofpact_conntrack *ofc,
     put_ct_mark(&ctx->xin->flow, ctx->odp_actions, ctx->wc);
     put_ct_label(&ctx->xin->flow, ctx->odp_actions, ctx->wc);
     put_ct_helper(ctx, ctx->odp_actions, ofc);
+    if (ofc->flags & NX_CT_F_COMMIT) {
+        put_ct_timeout(ctx->odp_actions, ctx->xbridge->ofproto->backer,
+                       &ctx->xin->flow, ctx->wc, zone);
+    }
     put_ct_nat(ctx);
     ctx->ct_nat_action = NULL;
     nl_msg_end_nested(ctx->odp_actions, ct_offset);

@@ -374,4 +374,8 @@ int ofproto_dpif_delete_internal_flow(struct ofproto_dpif *, struct match *,
 
 bool ovs_native_tunneling_is_on(struct ofproto_dpif *);
 
+bool ofproto_dpif_ct_zone_timeout_policy_get_name(
+    const struct dpif_backer *backer, uint16_t zone, uint16_t dl_type,
+    uint8_t nw_proto, struct ds *tp_name, bool *unwildcard);
+
 #endif /* ofproto-dpif.h */
