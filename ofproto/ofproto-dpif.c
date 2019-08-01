@@ -5377,6 +5377,33 @@ ct_del_zone_timeout_policy(const char *datapath_type, uint16_t zone)
     }
 }
 
+/* Gets timeout policy name in 'backer' based on 'zone', 'dl_type' and
+ * 'nw_proto'.  Returns true if the zoned-based timeout policy is configured.
+ * On success, stores the timeout policy name in 'tp_name', and sets
+ * 'unwildcard' based on the dpif implementation.  Sets 'unwildcard' to true
+ * if the timeout policy is 'dl_type' and 'nw_proto' specific. */
+bool
+ofproto_dpif_ct_zone_timeout_policy_get_name(
+    const struct dpif_backer *backer, uint16_t zone, uint16_t dl_type,
+    uint8_t nw_proto, struct ds *tp_name, bool *unwildcard)
+{
+    struct ct_zone *ct_zone;
+
+    if (!ct_dpif_timeout_policy_support_ipproto(nw_proto)) {
+        return false;
+    }
+
+    ct_zone = ct_zone_lookup(&backer->ct_zones, zone);
+    if (!ct_zone) {
+        return false;
+    }
+
+    return (!ct_dpif_get_timeout_policy_name(backer->dpif,
+                                             ct_zone->ct_tp->tp_id, dl_type,
+                                             nw_proto, tp_name, unwildcard)
+            ? true : false);
+}
+
 static bool
 set_frag_handling(struct ofproto *ofproto_,
                   enum ofputil_frag_handling frag_handling)
