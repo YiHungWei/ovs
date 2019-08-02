@@ -5635,77 +5635,100 @@ ovs-vsctl add-port br0 p0 -- set Interface p0 type=patch options:peer=p1 \
           The <code>timeouts</code> column contains key-value pairs used
           to configure connection tracking timeouts in a datapath.
           Key-value pairs that are not supported by a datapath are
-          ignored.
+          ignored.  The timeout value is in seconds.
       </column>
 
       <group title="TCP Timeouts">
         <column name="timeouts" key="tcp_syn_sent">
-          TCP SYN sent timeout.
+          The timeout for the connection after the first TCP SYN packet has
+          been seen by conntrack.
         </column>
 
         <column name="timeouts" key="tcp_syn_recv">
-          TCP SYN receive timeout.
+          The timeout of the connection after the first TCP SYN-ACK packet
+          has been seen by conntrack.
         </column>
 
         <column name="timeouts" key="tcp_established">
-          TCP established timeout.
+          The timeout of the connection after the connection has fully
+          established.
         </column>
 
         <column name="timeouts" key="tcp_fin_wait">
-          TCP FIN wait timeout.
+          The timeout of the connection after the first TCP FIN packet
+          has been seen by conntrack.
         </column>
 
         <column name="timeouts" key="tcp_close_wait">
-          TCP close wait timeout.
+          The timeout of the connection after the first TCP ACK packet
+          has been seen after it receives TCP FIN packet.  This value
+          only applies to Linux kernel datapath.
         </column>
 
         <column name="timeouts" key="tcp_last_ack">
-          TCP last ACK timeout.
+          The timeout of the connection after TCP FIN packets has been
+          seen by conntrack from both directions.  This value only
+          applies to Linux kernel datapath.
         </column>
 
         <column name="timeouts" key="tcp_time_wait">
-          TCP time wait timeout.
+          The timeout of the connection after conntrack has seen the
+          TCP ACK packet for the second TCP FIN packet.
         </column>
 
         <column name="timeouts" key="tcp_close">
-          TCP close timeout.
+          The timeout of the connection after the first TCP RST packet
+          has been seen by conntrack.
         </column>
 
         <column name="timeouts" key="tcp_syn_sent2">
-          TCP syn sent2 timeout.
+          The timeout of the connection when only TCP SYN packet has been
+          seen by conntrack from both directions (simultaneous open).
+          This value only applies to Linux kernel datapath.
         </column>
 
         <column name="timeouts" key="tcp_retransmit">
-          TCP retransmit timeout.
+          The timeout of the connection when it exceeds the maximum
+          number of retransmissions.  This value only applies to Linux
+          kernel datapath.
         </column>
 
         <column name="timeouts" key="tcp_unack">
-          TCP unacknowledgment timeout.
+          The timeout of the connection when non-SYN packets create an
+          established connection in TCP loose tracking mode.  This value
+          only applies to Linux kernel datapath.
         </column>
       </group>
 
       <group title="UDP Timeouts">
         <column name="timeouts" key="udp_first">
-          First UDP packet timeout.
+          The timeout of the connection after the first UDP packet has
+          been seen by conntrack.  This value only applies to userspace
+          datapath.
         </column>
 
         <column name="timeouts" key="udp_single">
-          The timeout in the state that source host sends more than one packet
-          but the destination host has never sent one backs.
+          The timeout of the connection when conntrack only seen UDP
+          packet from the source host, but the destination host has never
+          sent one backs.
         </column>
 
         <column name="timeouts" key="udp_multiple">
-          UDP packets seen in both directions timeout.
+         The timeout of the connection when UDP packets seen in both
+         directions.
         </column>
       </group>
 
       <group title="ICMP Timeouts">
         <column name="timeouts" key="icmp_first">
-          First ICMP timeout.
+          The timeout of the connection after the first ICMP packet has
+          been seen by conntrack.
         </column>
 
         <column name="timeouts" key="icmp_reply">
-          ICMP reply timeout.
+          The timeout of the connection after an ICMP error is replied in
+          response to an ICMP packet.  This value only applies to userspace
+          datapath.
         </column>
       </group>
     </group>
