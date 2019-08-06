@@ -261,10 +261,10 @@ enum OVS_PACKED_ENUM ct_dpif_tp_attr {
 };
 
 struct ct_dpif_timeout_policy {
-    uint32_t    id;         /* An unique identifier of a timeout policy in
+    uint32_t    id;         /* Unique identifier for the timeout policy in
                              * the datapath. */
     uint32_t    present;    /* If a timeout attribute is present set the
-                             * corresponding bit. */
+                             * corresponding CT_DPIF_TP_ATTR_* mapping bit. */
     uint32_t    attrs[CT_DPIF_TP_ATTR_MAX];     /* An array that specifies
                                                  * timeout attribute values */
 };

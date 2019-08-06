@@ -22,7 +22,6 @@
 #include "byte-order.h"
 #include "compiler.h"
 #include "ct-dpif.h"
-#include "netlink-socket.h"
 #include "openvswitch/dynamic-string.h"
 #include "openvswitch/hmap.h"
 #include "openvswitch/ofpbuf.h"
@@ -50,7 +49,7 @@ struct nl_ct_dump_state;
 struct nl_ct_timeout_policy_dump_state;
 
 int nl_ct_dump_start(struct nl_ct_dump_state **, const uint16_t *zone,
-        int *ptot_bkts);
+                     int *ptot_bkts);
 int nl_ct_dump_next(struct nl_ct_dump_state *, struct ct_dpif_entry *);
 int nl_ct_dump_done(struct nl_ct_dump_state *);
 
@@ -59,11 +58,8 @@ int nl_ct_flush_zone(uint16_t zone);
 int nl_ct_flush_tuple(const struct ct_dpif_tuple *, uint16_t zone);
 
 int nl_ct_set_timeout_policy(const struct nl_ct_timeout_policy *nl_tp);
-int nl_ct_set_default_timeout_policy(const struct nl_ct_timeout_policy *nl_tp);
 int nl_ct_get_timeout_policy(const char *tp_name,
                              struct nl_ct_timeout_policy *nl_tp);
-int nl_ct_get_default_timeout_policy(uint16_t l3num, uint8_t l4num,
-                                     struct nl_ct_timeout_policy *nl_tp);
 int nl_ct_del_timeout_policy(const char *tp_name);
 int nl_ct_timeout_policy_dump_start(
     struct nl_ct_timeout_policy_dump_state **statep);

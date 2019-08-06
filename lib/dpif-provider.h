@@ -502,16 +502,16 @@ struct dpif_class {
     /* Connection tracking timeout policy */
 
     /* A connection tracking timeout policy contains a list of timeout
-     * attributes that specifies timeout values on various connection states.
-     * In a datapath, the timeout policy is identified by a 4 bytes unsigned
-     * integer, and the unsupported timeout attributes are ignored.
-     * When a connection is committed it can be associated with a timeout
+     * attributes that specify timeout values on various connection states.
+     * In a datapath, the timeout policy is identified by a 4-byte unsigned
+     * integer.  Unsupported timeout attributes are ignored.  When a
+     * connection is committed it can be associated with a timeout
      * policy, or it defaults to the datapath's default timeout policy. */
 
     /* Sets timeout policy '*tp' into the datapath. */
     int (*ct_set_timeout_policy)(struct dpif *,
                                  const struct ct_dpif_timeout_policy *tp);
-    /* Gets a timeout policy specified by tp_id and stores it into '*tp'.*/
+    /* Gets a timeout policy specified by tp_id and stores it into '*tp'. */
     int (*ct_get_timeout_policy)(struct dpif *, uint32_t tp_id,
                                  struct ct_dpif_timeout_policy *tp);
     /* Deletes a timeout policy identified by 'tp_id'. */

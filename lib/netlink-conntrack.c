@@ -1061,34 +1061,6 @@ nl_ct_set_timeout_policy(const struct nl_ct_timeout_policy *nl_tp)
 }
 
 int
-nl_ct_set_default_timeout_policy(const struct nl_ct_timeout_policy *nl_tp)
-{
-    struct ofpbuf buf;
-    size_t offset;
-    int i, err;
-
-    ofpbuf_init(&buf, 512);
-    nl_msg_put_nfgenmsg(&buf, 0, AF_UNSPEC, NFNL_SUBSYS_CTNETLINK_TIMEOUT,
-                        IPCTNL_MSG_TIMEOUT_DEFAULT_SET, NLM_F_REQUEST
-                        | NLM_F_ACK | NLM_F_REPLACE);
-
-    nl_msg_put_be16(&buf, CTA_TIMEOUT_L3PROTO, htons(nl_tp->l3num));
-    nl_msg_put_u8(&buf, CTA_TIMEOUT_L4PROTO, nl_tp->l4num);
-
-    offset = nl_msg_start_nested(&buf, CTA_TIMEOUT_DATA);
-    for (i = 1; i <= nl_ct_timeout_policy_max_attr[nl_tp->l4num]; ++i) {
-        if (nl_tp->present & 1 << i) {
-            nl_msg_put_be32(&buf, i, htonl(nl_tp->attrs[i]));
-        }
-    }
-    nl_msg_end_nested(&buf, offset);
-
-    err = nl_transact(NETLINK_NETFILTER, &buf, NULL);
-    ofpbuf_uninit(&buf);
-    return err;
-}
-
-int
 nl_ct_get_timeout_policy(const char *tp_name,
                          struct nl_ct_timeout_policy *nl_tp)
 {
@@ -1105,33 +1077,6 @@ nl_ct_get_timeout_policy(const char *tp_name,
     }
 
     err = nl_ct_timeout_policy_from_ofpbuf(reply, nl_tp, false);
-
-out:
-    ofpbuf_uninit(&request);
-    ofpbuf_delete(reply);
-    return err;
-}
-
-int
-nl_ct_get_default_timeout_policy(uint16_t l3num, uint8_t l4num,
-                                 struct nl_ct_timeout_policy *nl_tp)
-{
-    struct ofpbuf request, *reply;
-    int err;
-
-    ofpbuf_init(&request, 512);
-    nl_msg_put_nfgenmsg(&request, 0, AF_UNSPEC, NFNL_SUBSYS_CTNETLINK_TIMEOUT,
-                        IPCTNL_MSG_TIMEOUT_DEFAULT_GET,
-                        NLM_F_REQUEST | NLM_F_ACK);
-
-    nl_msg_put_be16(&request, CTA_TIMEOUT_L3PROTO, htons(l3num));
-    nl_msg_put_u8(&request, CTA_TIMEOUT_L4PROTO, l4num);
-    err = nl_transact(NETLINK_NETFILTER, &request, &reply);
-    if (err) {
-        goto out;
-    }
-
-    err = nl_ct_timeout_policy_from_ofpbuf(reply, nl_tp, true);
 
 out:
     ofpbuf_uninit(&request);

@@ -3042,7 +3042,8 @@ enum OVS_PACKED_ENUM dpif_netlink_support_timeout_policy_protocol {
     DPIF_NL_TP_MAX
 };
 
-#define DPIF_NL_ALL_TP 0x3F
+#define DPIF_NL_ALL_TP ((1UL << DPIF_NL_TP_MAX) - 1)
+
 
 static struct dpif_netlink_timeout_policy_protocol tp_protos[] = {
     [DPIF_NL_TP_AF_INET_TCP] = { .l3num = AF_INET, .l4num = IPPROTO_TCP },
@@ -3202,7 +3203,7 @@ dpif_netlink_set_ct_dpif_tp_icmpv6_attrs(
 
 static void
 dpif_netlink_set_ct_dpif_tp_attrs(const struct nl_ct_timeout_policy *nl_tp,
-                               struct ct_dpif_timeout_policy *tp)
+                                  struct ct_dpif_timeout_policy *tp)
 {
     if (nl_tp->l4num == IPPROTO_TCP) {
         dpif_netlink_set_ct_dpif_tp_tcp_attrs(nl_tp, tp);
@@ -3285,7 +3286,7 @@ dpif_netlink_ct_set_timeout_policy(struct dpif *dpif OVS_UNUSED,
 
 out:
     ds_destroy(&nl_tp_name);
-    return  err;
+    return err;
 }
 
 static int
@@ -3314,7 +3315,7 @@ dpif_netlink_ct_get_timeout_policy(struct dpif *dpif OVS_UNUSED,
 
 out:
     ds_destroy(&nl_tp_name);
-    return  err;
+    return err;
 }
 
 /* Returns 0 if all the sub timeout policies are deleted or
@@ -3353,7 +3354,7 @@ struct dpif_netlink_ct_timeout_policy_dump_state {
 struct dpif_netlink_tp_dump_node {
     struct      hmap_node hmap_node;      /* node in tp_dump_map. */
     struct      ct_dpif_timeout_policy *tp;
-    uint32_t    present;
+    uint32_t    l3_l4_present;
 };
 
 static struct dpif_netlink_tp_dump_node *
@@ -3363,7 +3364,7 @@ get_dpif_netlink_tp_dump_node_by_tp_id(uint32_t tp_id,
     struct dpif_netlink_tp_dump_node *tp_dump_node;
 
     HMAP_FOR_EACH_WITH_HASH (tp_dump_node, hmap_node, hash_int(tp_id, 0),
-                            tp_dump_map) {
+                             tp_dump_map) {
         if (tp_dump_node->tp->id == tp_id) {
             return tp_dump_node;
         }
@@ -3382,7 +3383,7 @@ update_dpif_netlink_tp_dump_node(
     for (i = 0; i < DPIF_NL_TP_MAX; ++i) {
         if (nl_tp->l3num == tp_protos[i].l3num &&
             nl_tp->l4num == tp_protos[i].l4num) {
-            tp_dump_node->present |= 1 << i;
+            tp_dump_node->l3_l4_present |= 1 << i;
             break;
         }
     }
@@ -3412,11 +3413,12 @@ dpif_netlink_ct_timeout_policy_dump_next(struct dpif *dpif OVS_UNUSED,
 {
     struct dpif_netlink_ct_timeout_policy_dump_state *dump_state = state;
     struct dpif_netlink_tp_dump_node *tp_dump_node;
-    struct nl_ct_timeout_policy nl_tp;
-    uint32_t tp_id;
     int err;
 
     do {
+        struct nl_ct_timeout_policy nl_tp;
+        uint32_t tp_id;
+
         err =  nl_ct_timeout_policy_dump_next(dump_state->nl_dump_state,
                                               &nl_tp);
         if (err) {
@@ -3438,7 +3440,7 @@ dpif_netlink_ct_timeout_policy_dump_next(struct dpif *dpif OVS_UNUSED,
         }
 
         update_dpif_netlink_tp_dump_node(&nl_tp, tp_dump_node);
-        if (tp_dump_node->present == DPIF_NL_ALL_TP) {
+        if (tp_dump_node->l3_l4_present == DPIF_NL_ALL_TP) {
             hmap_remove(&dump_state->tp_dump_map, &tp_dump_node->hmap_node);
             *tp = *tp_dump_node->tp;
             free(tp_dump_node->tp);
