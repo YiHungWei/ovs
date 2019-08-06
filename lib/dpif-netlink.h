@@ -22,7 +22,6 @@
 #include <stdint.h>
 
 #include "flow.h"
-#include "netlink-conntrack.h"
 
 struct ofpbuf;
 

@@ -526,8 +526,14 @@ struct dpif_class {
      * a newly allocated structure that will be passed by the caller to
      * ct_timeout_policy_dump_next() and ct_timeout_policy_dump_done().
      *
-     * ct_timeout_policy_dump_next() fills a timeout policy into '*tp',
-     * and prepares to dump the next one on a subsequent invocation.
+     * ct_timeout_policy_dump_next() attempts to retrieve another timeout
+     * policy from 'dpif' for 'state', which was initialized by a successful
+     * call to ct_timeout_policy_dump_start().  On success, stores a new
+     * timeout policy into 'tp' and returns 0.  Returns EOF if the last
+     * timeout policy has been dumped, or a positive errno value on error.
+     * This function will not be called again once it returns nonzero once
+     * for a given iteration (but the ct_timeout_policy_dump_done() will
+     * be called afterward).
      *
      * ct_timeout_policy_dump_done() should perform any cleanup necessary
      * (including deallocating the 'state' structure, if applicable). */

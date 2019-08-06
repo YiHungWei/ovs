@@ -3472,9 +3472,14 @@ dpif_netlink_ct_timeout_policy_dump_done(struct dpif *dpif OVS_UNUSED,
                                          void *state)
 {
     struct dpif_netlink_ct_timeout_policy_dump_state *dump_state = state;
+    struct dpif_netlink_tp_dump_node *tp_dump_node;
     int err;
 
     err = nl_ct_timeout_policy_dump_done(dump_state->nl_dump_state);
+    HMAP_FOR_EACH_POP (tp_dump_node, hmap_node, &dump_state->tp_dump_map) {
+        free(tp_dump_node->tp);
+        free(tp_dump_node);
+    }
     hmap_destroy(&dump_state->tp_dump_map);
     free(dump_state);
     return err;
