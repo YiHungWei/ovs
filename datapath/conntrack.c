@@ -2279,6 +2279,7 @@ int ovs_ct_init(struct net *net)
 {
 	unsigned int n_bits = sizeof(struct ovs_key_ct_labels) * BITS_PER_BYTE;
 	struct ovs_net *ovs_net = net_generic(net, ovs_net_id);
+	int err;
 
 	if (nf_connlabels_get(net, n_bits - 1)) {
 		ovs_net->xt_label = false;
@@ -2288,15 +2289,37 @@ int ovs_ct_init(struct net *net)
 	}
 
 #if	IS_ENABLED(CONFIG_NETFILTER_CONNCOUNT)
-	return ovs_ct_limit_init(net, ovs_net);
-#else
-	return 0;
+	err = ovs_ct_limit_init(net, ovs_net);
+	if (err)
+		goto exit_err;
 #endif
+
+#if defined(CONFIG_NF_CONNTRACK_TIMEOUT) && defined(HAVE_NF_CT_L3PROTO)
+	err = nf_ct_l3proto_try_module_get(AF_INET);
+	if (err) {
+		pr_err("openvswitch: failed to init nf_conntrack_ipv4 %d\n", err);
+		goto exit_err;
+	}
+
+	err = nf_ct_l3proto_try_module_get(AF_INET6);
+	if (err) {
+		pr_err("openvswitch: failed to init nf_conntrack_ipv6 %d\n", err);
+		goto exit_err;
+	}
+#endif
+
+exit_err:
+	return err;
 }
 
 void ovs_ct_exit(struct net *net)
 {
 	struct ovs_net *ovs_net = net_generic(net, ovs_net_id);
+
+#if defined(CONFIG_NF_CONNTRACK_TIMEOUT) && defined(HAVE_NF_CT_L3PROTO)
+	nf_ct_l3proto_module_put(AF_INET);
+	nf_ct_l3proto_module_put(AF_INET6);
+#endif
 
 #if	IS_ENABLED(CONFIG_NETFILTER_CONNCOUNT)
 	ovs_ct_limit_exit(net, ovs_net);
