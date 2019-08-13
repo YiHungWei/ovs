@@ -1317,6 +1317,67 @@ check_ct_clear(struct dpif_backer *backer)
     return supported;
 }
 
+/* Tests whether 'backer''s datapath supports the OVS_CT_ATTR_TIMEOUT
+ * attribute in OVS_ACTION_ATTR_CT. */
+static bool
+check_ct_timeout_policy(struct dpif_backer *backer)
+{
+    struct dpif_execute execute;
+    struct dp_packet packet;
+    struct ofpbuf actions;
+    struct flow flow = {
+        .dl_type = CONSTANT_HTONS(ETH_TYPE_IP),
+        .nw_proto = IPPROTO_UDP,
+        .nw_ttl = 64,
+        /* Use the broadcast address on the loopback address range 127/8 to
+         * avoid hitting any real conntrack entries.  We leave the UDP ports to
+         * zeroes for the same purpose. */
+        .nw_src = CONSTANT_HTONL(0x7fffffff),
+        .nw_dst = CONSTANT_HTONL(0x7fffffff),
+    };
+    size_t ct_start;
+    int error;
+
+    /* Compose CT action with timeout policy attribute and check if datapath
+     * can decode the message.  */
+    ofpbuf_init(&actions, 64);
+    ct_start = nl_msg_start_nested(&actions, OVS_ACTION_ATTR_CT);
+    /* Timeout policy has no effect without the commit flag, but currently the
+     * datapath will accept a timeout policy even without commit.  This is
+     * useful as we do not want to persist the probe connection in the
+     * conntrack table. */
+    nl_msg_put_string(&actions, OVS_CT_ATTR_TIMEOUT, "ovs_test_tp");
+    nl_msg_end_nested(&actions, ct_start);
+
+    /* Compose a dummy UDP packet. */
+    dp_packet_init(&packet, 0);
+    flow_compose(&packet, &flow, NULL, 64);
+
+    /* Execute the actions.  On older datapaths this fails with EINVAL, on
+     * newer datapaths it succeeds. */
+    execute.actions = actions.data;
+    execute.actions_len = actions.size;
+    execute.packet = &packet;
+    execute.flow = &flow;
+    execute.needs_help = false;
+    execute.probe = true;
+    execute.mtu = 0;
+
+    error = dpif_execute(backer->dpif, &execute);
+
+    dp_packet_uninit(&packet);
+    ofpbuf_uninit(&actions);
+
+    if (error) {
+        VLOG_INFO("%s: Datapath does not support timeout policy in conntrack "
+                  "action", dpif_name(backer->dpif));
+    } else {
+        VLOG_INFO("%s: Datapath supports timeout policy in conntrack action",
+                  dpif_name(backer->dpif));
+    }
+
+    return !error;
+}
 
 /* Tests whether 'backer''s datapath supports the
  * OVS_ACTION_ATTR_CHECK_PKT_LEN action. */
@@ -1467,6 +1528,7 @@ check_support(struct dpif_backer *backer)
     backer->rt_support.ct_clear = check_ct_clear(backer);
     backer->rt_support.max_hash_alg = check_max_dp_hash_alg(backer);
     backer->rt_support.check_pkt_len = check_check_pkt_len(backer);
+    backer->rt_support.ct_timeout = check_ct_timeout_policy(backer);
 
     /* Flow fields. */
     backer->rt_support.odp.ct_state = check_ct_state(backer);

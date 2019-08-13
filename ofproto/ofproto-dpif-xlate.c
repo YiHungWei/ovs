@@ -6085,15 +6085,15 @@ compose_conntrack_action(struct xlate_ctx *ctx, struct ofpact_conntrack *ofc,
             nl_msg_put_u32(ctx->odp_actions, OVS_CT_ATTR_EVENTMASK,
                            OVS_CT_EVENTMASK_DEFAULT);
         }
+        if (ctx->xbridge->support.ct_timeout) {
+            put_ct_timeout(ctx->odp_actions, ctx->xbridge->ofproto->backer,
+                           &ctx->xin->flow, ctx->wc, zone);
+        }
     }
     nl_msg_put_u16(ctx->odp_actions, OVS_CT_ATTR_ZONE, zone);
     put_ct_mark(&ctx->xin->flow, ctx->odp_actions, ctx->wc);
     put_ct_label(&ctx->xin->flow, ctx->odp_actions, ctx->wc);
     put_ct_helper(ctx, ctx->odp_actions, ofc);
-    if (ofc->flags & NX_CT_F_COMMIT) {
-        put_ct_timeout(ctx->odp_actions, ctx->xbridge->ofproto->backer,
-                       &ctx->xin->flow, ctx->wc, zone);
-    }
     put_ct_nat(ctx);
     ctx->ct_nat_action = NULL;
     nl_msg_end_nested(ctx->odp_actions, ct_offset);
