@@ -542,15 +542,16 @@ struct dpif_class {
                                        struct ct_dpif_timeout_policy *tp);
     int (*ct_timeout_policy_dump_done)(struct dpif *, void *state);
 
-    /* Gets timeout policy name based on 'tp_id', 'dl_type' and 'nw_proto'.
+    /* Gets timeout policy based on 'tp_id', 'dl_type' and 'nw_proto'.
      * On success, returns 0, stores the timeout policy name in 'tp_name',
-     * and sets 'unwildcard'.  'unwildcard' is true if the timeout
-     * policy in 'dpif' is 'dl_type' and 'nw_proto' specific, .i.e. in
-     * kernel datapath.  Sets 'unwildcard' to false if the timeout policy
-     * is generic to all supported 'dl_type' and 'nw_proto'. */
+     * and sets 'is_generic'. 'is_generic' is true if dpif supports
+     * generic timeout policy.  'is_generic' is used to tell if the timeout
+     * policy in the 'dpif' is generic to all supported L3/L4 protocols,
+     * or is specific to 'dl_type' and 'nw_proto' in the datapath, i.e.
+     * in kernel datapath.  */
     int (*ct_get_timeout_policy_name)(struct dpif *, uint32_t tp_id,
                                       uint16_t dl_type, uint8_t nw_proto,
-                                      struct ds *tp_name, bool *unwildcard);
+                                      struct ds *tp_name, bool *is_generic);
 
     /* IP Fragmentation. */
 

@@ -3075,11 +3075,11 @@ dpif_netlink_format_tp_name(uint32_t id, uint16_t l3num, uint8_t l4num,
 static int
 dpif_netlink_ct_get_timeout_policy_name(struct dpif *dpif OVS_UNUSED,
     uint32_t tp_id, uint16_t dl_type, uint8_t nw_proto, struct ds *tp_name,
-    bool *unwildcard)
+    bool *is_generic)
 {
     dpif_netlink_format_tp_name(tp_id,
         dl_type == ETH_TYPE_IP ? AF_INET : AF_INET6, nw_proto, tp_name);
-    *unwildcard = true;
+    *is_generic = false;
     return 0;
 }
 

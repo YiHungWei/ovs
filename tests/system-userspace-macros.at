@@ -312,12 +312,5 @@ m4_define([OVS_CHECK_KERNEL_EXCL],
 m4_define([VSCTL_ADD_DATAPATH_TABLE],
 [
     AT_CHECK([ovs-vsctl -- --id=@m create Datapath datapath_version=0 -- set Open_vSwitch . datapaths:"netdev"=@m], [0], [stdout])
-])
-
-# VSCTL_ADD_ZONE_TIMEOUT_POLICY([parameters])
-#
-# Add zone based timeout policy to userspace datapath
-m4_define([VSCTL_ADD_ZONE_TIMEOUT_POLICY],
-[
-    AT_CHECK([ovs-vsctl add-zone-tp netdev $1], [0], [stdout])
+    DP_TYPE=$(echo "netdev")
 ])

@@ -5436,28 +5436,34 @@ ct_del_zone_timeout_policy(const char *datapath_type, uint16_t zone)
 /* Gets timeout policy name in 'backer' based on 'zone', 'dl_type' and
  * 'nw_proto'.  Returns true if the zoned-based timeout policy is configured.
  * On success, stores the timeout policy name in 'tp_name', and sets
- * 'unwildcard' based on the dpif implementation.  Sets 'unwildcard' to true
- * if the timeout policy is 'dl_type' and 'nw_proto' specific. */
+ * 'unwildcard' based on the dpif implementation.  If 'unwildcard' is true,
+ * the timeout policy is 'dl_type' and 'nw_proto' specific.  Then OVS needs
+ * to unwildcard the datapath flow for this timeout policy in flow translation.  */
 bool
 ofproto_dpif_ct_zone_timeout_policy_get_name(
     const struct dpif_backer *backer, uint16_t zone, uint16_t dl_type,
     uint8_t nw_proto, struct ds *tp_name, bool *unwildcard)
 {
-    struct ct_zone *ct_zone;
+    bool is_generic_tp;
 
     if (!ct_dpif_timeout_policy_support_ipproto(nw_proto)) {
         return false;
     }
 
-    ct_zone = ct_zone_lookup(&backer->ct_zones, zone);
+    struct ct_zone *ct_zone = ct_zone_lookup(&backer->ct_zones, zone);
     if (!ct_zone) {
         return false;
     }
 
-    return (!ct_dpif_get_timeout_policy_name(backer->dpif,
-                                             ct_zone->ct_tp->tp_id, dl_type,
-                                             nw_proto, tp_name, unwildcard)
-            ? true : false);
+    if (ct_dpif_get_timeout_policy_name(backer->dpif,
+                                         ct_zone->ct_tp->tp_id, dl_type,
+                                         nw_proto, tp_name, &is_generic_tp)) {
+        return false;
+    }
+
+    /* Unwildcard datapath flow if it is not a generic timeout policy. */
+    *unwildcard = !is_generic_tp;
+    return true;
 }
 
 static bool
