@@ -421,7 +421,7 @@ struct nf_ct_tcp_flags {
     UINT8 mask;
 };
 
-/* File: nfnetlink_cttimeout.h */
+/* File: nfnetlink_cttimeout.h. XXX: the following are not implemented */
 enum ctnl_timeout_msg_types {
     IPCTNL_MSG_TIMEOUT_NEW,
     IPCTNL_MSG_TIMEOUT_GET,

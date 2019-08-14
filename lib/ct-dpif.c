@@ -794,9 +794,7 @@ bool
 ct_dpif_set_timeout_policy_attr_by_name(struct ct_dpif_timeout_policy *tp,
                                         const char *name, uint32_t value)
 {
-    uint32_t i;
-
-    for (i = 0; i < CT_DPIF_TP_ATTR_MAX; ++i) {
+    for (uint32_t i = 0; i < CT_DPIF_TP_ATTR_MAX; ++i) {
         if (!strcasecmp(name, ct_dpif_tp_attr_string[i])) {
             return ct_dpif_set_timeout_policy_attr(tp, i, value);
         }

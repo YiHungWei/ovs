@@ -3267,9 +3267,9 @@ dpif_netlink_ct_set_timeout_policy(struct dpif *dpif OVS_UNUSED,
 {
     struct nl_ct_timeout_policy nl_tp;
     struct ds nl_tp_name = DS_EMPTY_INITIALIZER;
-    int i, err = 0;
+    int err = 0;
 
-    for (i = 0; i < ARRAY_SIZE(tp_protos); ++i) {
+    for (int i = 0; i < ARRAY_SIZE(tp_protos); ++i) {
         dpif_netlink_format_tp_name(tp->id, tp_protos[i].l3num,
                                     tp_protos[i].l4num, &nl_tp_name);
         ovs_strlcpy(nl_tp.name, ds_cstr(&nl_tp_name), sizeof nl_tp.name);
@@ -3296,11 +3296,11 @@ dpif_netlink_ct_get_timeout_policy(struct dpif *dpif OVS_UNUSED,
 {
     struct nl_ct_timeout_policy nl_tp;
     struct ds nl_tp_name = DS_EMPTY_INITIALIZER;
-    int i, err = 0;
+    int err = 0;
 
     tp->id = tp_id;
     tp->present = 0;
-    for (i = 0; i < ARRAY_SIZE(tp_protos); ++i) {
+    for (int i = 0; i < ARRAY_SIZE(tp_protos); ++i) {
         dpif_netlink_format_tp_name(tp_id, tp_protos[i].l3num,
                                     tp_protos[i].l4num, &nl_tp_name);
         err = nl_ct_get_timeout_policy(ds_cstr(&nl_tp_name), &nl_tp);
@@ -3325,9 +3325,9 @@ dpif_netlink_ct_del_timeout_policy(struct dpif *dpif OVS_UNUSED,
                                    uint32_t tp_id)
 {
     struct ds nl_tp_name = DS_EMPTY_INITIALIZER;
-    int i, err = 0;
+    int err = 0;
 
-    for (i = 0; i < ARRAY_SIZE(tp_protos); ++i) {
+    for (int i = 0; i < ARRAY_SIZE(tp_protos); ++i) {
         dpif_netlink_format_tp_name(tp_id, tp_protos[i].l3num,
                                     tp_protos[i].l4num, &nl_tp_name);
         err = nl_ct_del_timeout_policy(ds_cstr(&nl_tp_name));
@@ -3377,10 +3377,8 @@ update_dpif_netlink_tp_dump_node(
     const struct nl_ct_timeout_policy *nl_tp,
     struct dpif_netlink_tp_dump_node *tp_dump_node)
 {
-    int i;
-
     dpif_netlink_set_ct_dpif_tp_attrs(nl_tp, tp_dump_node->tp);
-    for (i = 0; i < DPIF_NL_TP_MAX; ++i) {
+    for (int i = 0; i < DPIF_NL_TP_MAX; ++i) {
         if (nl_tp->l3num == tp_protos[i].l3num &&
             nl_tp->l4num == tp_protos[i].l4num) {
             tp_dump_node->l3_l4_present |= 1 << i;
@@ -3406,6 +3404,17 @@ dpif_netlink_ct_timeout_policy_dump_start(struct dpif *dpif OVS_UNUSED,
     return 0;
 }
 
+static void
+get_and_cleanup_tp_dump_node(struct hmap *hmap,
+                             struct dpif_netlink_tp_dump_node *tp_dump_node,
+                             struct ct_dpif_timeout_policy *tp)
+{
+    hmap_remove(hmap, &tp_dump_node->hmap_node);
+    *tp = *tp_dump_node->tp;
+    free(tp_dump_node->tp);
+    free(tp_dump_node);
+}
+
 static int
 dpif_netlink_ct_timeout_policy_dump_next(struct dpif *dpif OVS_UNUSED,
                                          void *state,
@@ -3415,6 +3424,7 @@ dpif_netlink_ct_timeout_policy_dump_next(struct dpif *dpif OVS_UNUSED,
     struct dpif_netlink_tp_dump_node *tp_dump_node;
     int err;
 
+    /* Dumps all the timeout policies in the kernel. */
     do {
         struct nl_ct_timeout_policy nl_tp;
         uint32_t tp_id;
@@ -3425,6 +3435,7 @@ dpif_netlink_ct_timeout_policy_dump_next(struct dpif *dpif OVS_UNUSED,
             break;
         }
 
+        /* We only interest in OVS installed timeout policies. */
         if (!ovs_scan(nl_tp.name, NL_TP_NAME_PREFIX"%"PRIu32, &tp_id)) {
             continue;
         }
@@ -3440,26 +3451,25 @@ dpif_netlink_ct_timeout_policy_dump_next(struct dpif *dpif OVS_UNUSED,
         }
 
         update_dpif_netlink_tp_dump_node(&nl_tp, tp_dump_node);
+
+        /* Returns one ct_dpif_timeout_policy if we gather all the L3/L4
+         * sub-pieces. */
         if (tp_dump_node->l3_l4_present == DPIF_NL_ALL_TP) {
-            hmap_remove(&dump_state->tp_dump_map, &tp_dump_node->hmap_node);
-            *tp = *tp_dump_node->tp;
-            free(tp_dump_node->tp);
-            free(tp_dump_node);
+            get_and_cleanup_tp_dump_node(&dump_state->tp_dump_map, tp_dump_node,
+                                         tp);
             break;
         }
     } while (true);
 
-    /* Dump the incomplete timeout policy. */
+    /* Dump the incomplete timeout policies. */
     if (err == EOF) {
         if (!hmap_is_empty(&dump_state->tp_dump_map)) {
             struct hmap_node *hmap_node = hmap_first(&dump_state->tp_dump_map);
-
-            hmap_remove(&dump_state->tp_dump_map, hmap_node);
             tp_dump_node = CONTAINER_OF(hmap_node,
-                            struct dpif_netlink_tp_dump_node, hmap_node);
-            *tp = *tp_dump_node->tp;
-            free(tp_dump_node->tp);
-            free(tp_dump_node);
+                                        struct dpif_netlink_tp_dump_node,
+                                        hmap_node);
+            get_and_cleanup_tp_dump_node(&dump_state->tp_dump_map,
+                                         tp_dump_node, tp);
             return 0;
         }
     }
@@ -3473,9 +3483,8 @@ dpif_netlink_ct_timeout_policy_dump_done(struct dpif *dpif OVS_UNUSED,
 {
     struct dpif_netlink_ct_timeout_policy_dump_state *dump_state = state;
     struct dpif_netlink_tp_dump_node *tp_dump_node;
-    int err;
 
-    err = nl_ct_timeout_policy_dump_done(dump_state->nl_dump_state);
+    int err = nl_ct_timeout_policy_dump_done(dump_state->nl_dump_state);
     HMAP_FOR_EACH_POP (tp_dump_node, hmap_node, &dump_state->tp_dump_map) {
         free(tp_dump_node->tp);
         free(tp_dump_node);
