@@ -718,8 +718,6 @@ struct odp_garbage {
 
 static void check_support(struct dpif_backer *backer);
 
-#define MAX_TIMEOUT_POLICY_ID UINT32_MAX
-
 static int
 open_dpif_backer(const char *type, struct dpif_backer **backerp)
 {
@@ -5148,7 +5146,7 @@ ct_timeout_policy_alloc(struct simap *tp, struct id_pool *tp_ids)
     if (!id_pool_alloc_id(tp_ids, &ct_tp->tp_id)) {
         VLOG_ERR_RL(&rl, "failed to allocate timeout policy id.");
         simap_destroy(&ct_tp->tp);
-        free(tp);
+        free(ct_tp);
         return NULL;
     }
 
@@ -5241,24 +5239,24 @@ clear_existing_ct_timeout_policies(struct dpif_backer *backer)
      * the ids in the pool.  Since OVS will not use those timeout policies
      * for new datapath flow, we add them to the kill list and remove
      * them later on. */
+    struct ct_dpif_timeout_policy cdtp;
     void *state;
 
-    int err = ct_dpif_timeout_policy_dump_start(backer->dpif, &state);
-    if (err) {
+    if (ct_dpif_timeout_policy_dump_start(backer->dpif, &state)) {
         return;
     }
 
-    struct ct_dpif_timeout_policy cdtp;
-    while (!(err = ct_dpif_timeout_policy_dump_next(backer->dpif, state,
-                                                    &cdtp))) {
+    while (!ct_dpif_timeout_policy_dump_next(backer->dpif, state, &cdtp)) {
         struct ct_timeout_policy *ct_tp = ct_timeout_policy_alloc__();
         ct_tp->tp_id = cdtp.id;
         id_pool_add(backer->tp_ids, cdtp.id);
-        ovs_list_insert(&backer->ct_tp_kill_list, &ct_tp->list_node);
+        ovs_list_push_back(&backer->ct_tp_kill_list, &ct_tp->list_node);
     }
 
     ct_dpif_timeout_policy_dump_done(backer->dpif, state);
 }
+
+#define MAX_TIMEOUT_POLICY_ID UINT32_MAX
 
 static void
 ct_zone_config_init(struct dpif_backer *backer)
@@ -5316,16 +5314,14 @@ static void
 ct_set_zone_timeout_policy(const char *datapath_type, uint16_t zone,
                            struct simap *timeout_policy)
 {
-    struct dpif_backer *backer;
-    struct ct_timeout_policy *ct_tp;
-    struct ct_zone *ct_zone;
-
-    backer = shash_find_data(&all_dpif_backers, datapath_type);
+    struct dpif_backer *backer = shash_find_data(&all_dpif_backers,
+                                                 datapath_type);
     if (!backer) {
         return;
     }
 
-    ct_tp = ct_timeout_policy_lookup(&backer->ct_tps, timeout_policy);
+    struct ct_timeout_policy *ct_tp = ct_timeout_policy_lookup(&backer->ct_tps,
+                                                               timeout_policy);
     if (!ct_tp) {
         ct_tp = ct_timeout_policy_alloc(timeout_policy, backer->tp_ids);
         if (ct_tp) {
@@ -5337,7 +5333,7 @@ ct_set_zone_timeout_policy(const char *datapath_type, uint16_t zone,
         }
     }
 
-    ct_zone = ct_zone_lookup(&backer->ct_zones, zone);
+    struct ct_zone *ct_zone = ct_zone_lookup(&backer->ct_zones, zone);
     if (ct_zone) {
         if (ct_zone->ct_tp != ct_tp) {
             /* Add the new zone timeout pollicy. */
@@ -5362,15 +5358,13 @@ ct_set_zone_timeout_policy(const char *datapath_type, uint16_t zone,
 static void
 ct_del_zone_timeout_policy(const char *datapath_type, uint16_t zone)
 {
-    struct dpif_backer *backer;
-    struct ct_zone *ct_zone;
-
-    backer = shash_find_data(&all_dpif_backers, datapath_type);
+    struct dpif_backer *backer = shash_find_data(&all_dpif_backers,
+                                                 datapath_type);
     if (!backer) {
         return;
     }
 
-    ct_zone = ct_zone_lookup(&backer->ct_zones, zone);
+    struct ct_zone *ct_zone = ct_zone_lookup(&backer->ct_zones, zone);
     if (ct_zone) {
         ct_timeout_policy_unref(backer, ct_zone->ct_tp);
         ct_zone_remove_and_destroy(backer, ct_zone);

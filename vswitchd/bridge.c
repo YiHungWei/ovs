@@ -153,7 +153,7 @@ struct aa_mapping {
     char *br_name;
 };
 
-/* Internal representation of conntrak zone configuration table in OVSDB. */
+/* Internal representation of conntrack zone configuration table in OVSDB. */
 struct ct_zone {
     uint16_t zone;
     struct simap tp;            /* A map from timeout policy attribute to
@@ -681,11 +681,7 @@ datapath_lookup(const char *type)
 static struct datapath *
 datapath_create(const struct ovsrec_datapath *dp_cfg, const char *type)
 {
-    struct datapath *dp;
-
-    ovs_assert(!datapath_lookup(type));
-    dp = xzalloc(sizeof *dp);
-
+    struct datapath *dp = xzalloc(sizeof *dp);
     dp->type = xstrdup(type);
     dp->dp_cfg = dp_cfg;
 
@@ -697,10 +693,10 @@ datapath_create(const struct ovsrec_datapath *dp_cfg, const char *type)
 static void
 datapath_destroy(struct datapath *dp)
 {
-    struct ct_zone *ct_zone;
+    struct ct_zone *ct_zone, *next;
 
     if (dp) {
-        HMAP_FOR_EACH (ct_zone, node, &dp->ct_zones) {
+        HMAP_FOR_EACH_SAFE (ct_zone, next, node, &dp->ct_zones) {
             ofproto_ct_del_zone_timeout_policy(dp->type, ct_zone->zone);
             ct_zone_remove_and_destroy(dp, ct_zone);
         }
@@ -715,7 +711,7 @@ datapath_destroy(struct datapath *dp)
 static void
 update_datapath_cfgs(const struct ovsrec_open_vswitch *cfg)
 {
-    struct datapath *dp;
+    struct datapath *dp, *next;
     size_t i;
 
     /* Add new datapath configs. */
@@ -731,7 +727,7 @@ update_datapath_cfgs(const struct ovsrec_open_vswitch *cfg)
     }
 
     /* Get rid of deleted datapath configs. */
-    HMAP_FOR_EACH (dp, node, &all_datapaths) {
+    HMAP_FOR_EACH_SAFE (dp, next, node, &all_datapaths) {
         if (dp->last_used != idl_seqno) {
             datapath_destroy(dp);
         }
@@ -742,7 +738,7 @@ static void
 reconfigure_ct_zones(struct datapath *dp)
 {
     const struct ovsrec_datapath *dp_cfg = dp->dp_cfg;
-    struct ct_zone *ct_zone;
+    struct ct_zone *ct_zone, *next;
 
     /* Loop through all zones. Add or update configs. */
     for (size_t i = 0; i < dp_cfg->n_ct_zones; i++) {
@@ -768,7 +764,7 @@ reconfigure_ct_zones(struct datapath *dp)
     }
 
     /* Remove unused ct_zone configs. */
-    HMAP_FOR_EACH (ct_zone, node, &dp->ct_zones) {
+    HMAP_FOR_EACH_SAFE (ct_zone, next, node, &dp->ct_zones) {
         if (ct_zone->last_used != idl_seqno) {
             ofproto_ct_del_zone_timeout_policy(dp->type, ct_zone->zone);
             ct_zone_remove_and_destroy(dp, ct_zone);
