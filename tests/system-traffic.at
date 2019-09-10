@@ -3589,6 +3589,20 @@ table=1,in_port=2,tcp,ct_state=+trk+est,action=1
 table=1,in_port=2,tcp,ct_state=+trk+rel,action=1
 ])
 
+dnl flows4 is similar to flows1, except that we attach alg in the later commit.
+AT_DATA([flows4.txt], [dnl
+table=0,priority=1,action=drop
+table=0,priority=10,arp,action=normal
+table=0,priority=10,icmp,action=normal
+table=0,priority=100,in_port=1,tcp,action=ct(table=1)
+table=0,priority=100,in_port=2,tcp,action=ct(table=1)
+table=1,in_port=2,tcp,ct_state=+trk+est,action=1
+table=1,in_port=2,tcp,ct_state=+trk+rel,action=1
+table=1,priority=100,in_port=1,tcp,ct_state=+trk+new,action=ct(commit,table=2)
+table=1,priority=10,in_port=1,tcp,action=2
+table=2,in_port=1,tcp,action=ct(commit,alg=ftp),2
+])
+
 AT_CHECK([ovs-ofctl --bundle replace-flows br0 flows1.txt])
 
 OVS_START_L7([at_ns0], [ftp])
@@ -3639,6 +3653,22 @@ dnl FTP control requests from p0->p1 should work fine, but helper will not be as
 NS_CHECK_EXEC([at_ns0], [wget ftp://10.1.1.2 --no-passive-ftp -t 3 -T 1 --retry-connrefused -v -o wget0-3.log], [4])
 AT_CHECK([ovs-appctl dpctl/dump-conntrack | FORMAT_CT(10.1.1.2)], [0], [dnl
 tcp,orig=(src=10.1.1.1,dst=10.1.1.2,sport=<cleared>,dport=<cleared>),reply=(src=10.1.1.2,dst=10.1.1.1,sport=<cleared>,dport=<cleared>),protoinfo=(state=<cleared>)
+])
+
+dnl Try the fourth set of flows, that attach alg in the later commit.
+AT_CHECK([ovs-ofctl --bundle replace-flows br0 flows4.txt])
+AT_CHECK([ovs-appctl dpctl/flush-conntrack])
+
+dnl FTP requests from p1->p0 should fail due to network failure.
+dnl Try 3 times, in 1 second intervals.
+NS_CHECK_EXEC([at_ns1], [wget ftp://10.1.1.1 --no-passive-ftp  -t 3 -T 1 -v -o wget1.log], [4])
+AT_CHECK([ovs-appctl dpctl/dump-conntrack | FORMAT_CT(10.1.1.1)], [0], [dnl
+])
+
+dnl FTP requests from p0->p1 should work fine.
+NS_CHECK_EXEC([at_ns0], [wget ftp://10.1.1.2 --no-passive-ftp -t 3 -T 1 --retry-connrefused -v -o wget0.log])
+AT_CHECK([ovs-appctl dpctl/dump-conntrack | FORMAT_CT(10.1.1.2)], [0], [dnl
+tcp,orig=(src=10.1.1.1,dst=10.1.1.2,sport=<cleared>,dport=<cleared>),reply=(src=10.1.1.2,dst=10.1.1.1,sport=<cleared>,dport=<cleared>),protoinfo=(state=<cleared>),helper=ftp
 ])
 
 OVS_TRAFFIC_VSWITCHD_STOP
