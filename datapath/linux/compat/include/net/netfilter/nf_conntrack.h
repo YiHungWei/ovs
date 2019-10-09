@@ -23,6 +23,20 @@ nf_ct_set(struct sk_buff *skb, struct nf_conn *ct, enum ip_conntrack_info info)
 }
 #endif
 
+#ifdef HAVE_NF_CT_INVERT_TUPLEPR
+static inline bool rpl_nf_ct_invert_tuple(struct nf_conntrack_tuple *inverse,
+	const struct nf_conntrack_tuple *orig)
+{
+	return nf_ct_invert_tuplepr(inverse, orig);
+}
+#else
+static inline bool rpl_nf_ct_invert_tuple(struct nf_conntrack_tuple *inverse,
+	const struct nf_conntrack_tuple *orig)
+{
+	return nf_ct_invert_tuple(inverse, orig);
+}
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 int rpl_nf_ct_netns_get(struct net *net, u8 nfproto);
 void rpl_nf_ct_netns_put(struct net *net, u8 nfproto);
