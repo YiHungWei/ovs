@@ -143,6 +143,9 @@ static inline int nla_put_be64(struct sk_buff *skb, int attrtype, __be64 value,
 
 #endif
 
+#ifndef HAVE_NLA_PARSE_DEPRECATED_STRICT
+#define genlmsg_parse_deprecated genlmsg_parse
+
 #ifndef HAVE_NETLINK_EXT_ACK
 struct netlink_ext_ack;
 
@@ -153,7 +156,7 @@ static inline int rpl_nla_parse_nested(struct nlattr *tb[], int maxtype,
 {
 	return nla_parse_nested(tb, maxtype, nla, policy);
 }
-#define nla_parse_nested rpl_nla_parse_nested
+#define nla_parse_nested_deprecated rpl_nla_parse_nested
 
 static inline int rpl_nla_parse(struct nlattr **tb, int maxtype,
 				const struct nlattr *head, int len,
@@ -163,7 +166,12 @@ static inline int rpl_nla_parse(struct nlattr **tb, int maxtype,
 	return nla_parse(tb, maxtype, head, len, policy);
 }
 #define nla_parse rpl_nla_parse
-#endif
+
+#else /* HAVE_NETLINK_EXT_ACK */
+#define nla_parse_nested_deprecated nla_parse_nested
+#endif /* !HAVE_NETLINK_EXT_ACK */
+
+#endif /* HAVE_NLA_PARSE_DEPRECATED_STRICT */
 
 #ifndef HAVE_NLA_NEST_START_NOFLAG
 static inline struct nlattr *rpl_nla_nest_start_noflag(struct sk_buff *skb,
