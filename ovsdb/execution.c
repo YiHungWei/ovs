@@ -730,7 +730,7 @@ ovsdb_execute_wait(struct ovsdb_execution *x, struct ovsdb_parser *parser,
     }
     if (!error) {
         if (timeout) {
-            timeout_msec = MIN(LLONG_MAX, json_real(timeout));
+            timeout_msec = MIN(LLONG_MAX, (long long int) json_real(timeout));
             if (timeout_msec < 0) {
                 error = ovsdb_syntax_error(timeout, NULL,
                                            "timeout must be nonnegative");
