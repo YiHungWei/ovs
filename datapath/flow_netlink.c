@@ -901,13 +901,13 @@ static int __ip_tun_to_nlattr(struct sk_buff *skb,
 	if ((output->tun_flags & TUNNEL_OAM) &&
 	    nla_put_flag(skb, OVS_TUNNEL_KEY_ATTR_OAM))
 		return -EMSGSIZE;
-	if (swkey_tun_opts_len) {
-		if (output->tun_flags & TUNNEL_GENEVE_OPT &&
-		    nla_put(skb, OVS_TUNNEL_KEY_ATTR_GENEVE_OPTS,
+	if (output->tun_flags & TUNNEL_GENEVE_OPT) {
+		if (nla_put(skb, OVS_TUNNEL_KEY_ATTR_GENEVE_OPTS,
 			    swkey_tun_opts_len, tun_opts))
 			return -EMSGSIZE;
-		else if (output->tun_flags & TUNNEL_VXLAN_OPT &&
-			 vxlan_opt_to_nlattr(skb, tun_opts, swkey_tun_opts_len))
+	} else if (swkey_tun_opts_len) {
+		if (output->tun_flags & TUNNEL_VXLAN_OPT &&
+		     vxlan_opt_to_nlattr(skb, tun_opts, swkey_tun_opts_len))
 			return -EMSGSIZE;
 		else if (output->tun_flags & TUNNEL_ERSPAN_OPT &&
 			 nla_put(skb, OVS_TUNNEL_KEY_ATTR_ERSPAN_OPTS,
